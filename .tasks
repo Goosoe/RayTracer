@@ -1,0 +1,13 @@
+[build]
+command=build.bat build $(VIM_PROFILE)
+cwd=$(VIM_CWD)
+errorformat=%f:%l\,%c:\ %t%*[^:]:\ %m
+output=quickfix
+save=2
+
+[build-and-run]
+command=build.bat build-and-run $(VIM_PROFILE)
+cwd=$(VIM_CWD)
+errorformat=%f:%l\,%c:\ %t%*[^:]:\ %m
+output=quickfix
+save=2
