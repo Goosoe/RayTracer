@@ -4,6 +4,8 @@
 BACKGROUND_COLOR1 :: Vector3.{1.0, 1.0, 1.0};
 BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
 ORIGIN :: Vector3.{0.0, 0.0, 0.0};
+ANTI_ALIASING :: true;
+AA_SAMPLE_NUM :: 4;
 
 SPHERES := Sphere.[
     Sphere.{Vector3.{0, -100.5, -1}, 100},    // Big sphere to work as ground
@@ -52,6 +54,15 @@ renderFragment :: (ray : Ray) -> Vector3
     }
 }
 
+renderFragmentAliasing :: (ray : Ray) -> Vector3
+{
+    for 0..AA_SAMPLE_NUM
+    {
+
+    }
+}
+
+// TODO(Goose): refactor and do a camera properly
 calculateImageRatio :: () -> Vector2
 {
     smallerSide := min(IMAGE_X, IMAGE_Y);

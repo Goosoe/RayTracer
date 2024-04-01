@@ -34,6 +34,7 @@ main :: ()
     vertical := make_vector3(0.0, ratio.y * 2, 0.0);
     camera : Camera;
 
+    // iterates over every fragment
     y := IMAGE_Y - 1;
     while y >= 0
     {
@@ -48,7 +49,12 @@ main :: ()
             ray := Ray.{camera.location, lowerLeftCornerCoord + (uv.x * horizontal) + (uv.y * vertical)};
 
             // Creates the background color. Varies between white and blue
-            color := renderFragment(ray);
+            //todo: implement mee
+            // #if ANTI_ALIASING
+                color := renderFragmentAliasing(ray);
+            // #else !ANTI_ALIASING
+                // color := renderFragment(ray);
+            // #endif
 
             ir : u8 = cast(u8)(255.99 * color.x);
             ig : u8 = cast(u8)(255.99 * color.y);
@@ -58,5 +64,6 @@ main :: ()
             jpgData.data[jpgData.it + 2] = ib;
         }
     }
+    // writes the fragment data into FILE_OUTPUT
     stbi_write_jpg(FILE_OUTPUT, IMAGE_X, IMAGE_Y, JPG_CHANNELS, *jpgData.data, 100);
 }
