@@ -2,7 +2,7 @@
 #import "Math";
 
 /**
-* Has functions and structs that allows the user to interact with the scene
+* Has functions and structs that allows the user to query the scene
 */
 
 MAX_DIST :: 100.0;
@@ -39,8 +39,9 @@ pointAt :: (ray : Ray, point : float) -> Vector3
     return ray.origin + (point * ray.direction);
 }
 
-
-
+/**
+* SPHERE DATA
+*/
 /**
 * Verifies if the ray hit a sphere with the given properties
 */
@@ -90,3 +91,4 @@ checkSphereCollision :: (ray : Ray, center : Vector3, radius : float) -> bool, H
     //root did not comply with defined dist values
     return false, HitData.{};
 }
+/***********************/

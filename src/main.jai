@@ -2,6 +2,7 @@
 #import "Math";
 #import "File";
 #import "File_Utilities";
+#import "Random";
 #import "stb_image_write";
 
 #load "objects.jai";
@@ -10,7 +11,6 @@
 IMAGE_X :: 800;
 IMAGE_Y :: 600;
 FILE_OUTPUT :: "out.jpg";
-JPG_CHANNELS :: 3;
 
 // Helper for building the jpg
 JPGData :: struct
@@ -19,46 +19,55 @@ JPGData :: struct
     it := 0;
 };
 
+/*scene data*/
+SPHERES := Sphere.[
+    Sphere.{Vector3.{0, -100.5, -1}, 100},    // Big sphere to work as ground
+    Sphere.{Vector3.{0, 0, -1}, 0.5},
+    Sphere.{Vector3.{1, 1, -3}, 0.5},
+];
+/**/
 
 /*
 * Initializes data and requests data per pixel of the image. Outputs an image a .jpg in the end
 */
 main :: ()
 {
-    jpgData : JPGData;
-    assert(IMAGE_X >= 100);
-    assert(IMAGE_Y >= 100);
-    ratio := calculateImageRatio();
-    lowerLeftCornerCoord := make_vector3(-ratio.x, -ratio.y, -1.0);
-    horizontal := make_vector3(ratio.x * 2, 0.0, 0.0);
-    vertical := make_vector3(0.0, ratio.y * 2, 0.0);
-    camera : Camera;
+    // not deallocating because it is needed for the whole runtime of the program
+    jpgData : *JPGData = cast(*JPGData)alloc(size_of(JPGData));
+    // or
+    // jpgData := New(JPGData);
+    assert(IMAGE_X >= 100, "Image witdth must be > 100");
+    assert(IMAGE_Y >= 100, "Image length must be > 100");
+    assert(ZOOM > 0, "Zoom must be > 0");
 
-    // iterates over every fragment
-    y := IMAGE_Y - 1;
-    while y >= 0
+    for < y: IMAGE_Y - 1..0
     {
-        defer y -= 1;
-        x := 0;
-        while x < IMAGE_X
+        for x: 0..IMAGE_X - 1
         {
-            defer x += 1;
             defer jpgData.it += JPG_CHANNELS;
 
-            uv := make_vector2(cast(float) x / IMAGE_X, cast(float) y / IMAGE_Y);
-            ray := Ray.{camera.location, lowerLeftCornerCoord + (uv.x * horizontal) + (uv.y * vertical)};
-
-            // Creates the background color. Varies between white and blue
-            //todo: implement mee
-            // #if ANTI_ALIASING
-                color := renderFragmentAliasing(ray);
-            // #else !ANTI_ALIASING
-                // color := renderFragment(ray);
-            // #endif
-
+            coords := make_vector2(cast(float)x, cast(float)y);
+            #if ANTI_ALIASING
+            {
+                //TODO(Goose): the random should affect the UV, not the coords
+                color : Vector3;
+                for 0.. AA_SAMPLE_NUM
+                {
+                    random:= Vector2.{-0.5 + random_get_zero_to_one(), -0.5 + random_get_zero_to_one()};
+                    color += renderFragment(coords + random);
+                }
+                Clamp(*(color.x / AA_SAMPLE_NUM), 0, 1);
+                Clamp(*(color.y / AA_SAMPLE_NUM), 0, 1);
+                Clamp(*(color.z / AA_SAMPLE_NUM), 0, 1);
+            }
+            else
+            {
+                color := renderFragment(coords);
+            }
             ir : u8 = cast(u8)(255.99 * color.x);
             ig : u8 = cast(u8)(255.99 * color.y);
             ib : u8 = cast(u8)(255.99 * color.z);
+
             jpgData.data[jpgData.it] = ir;
             jpgData.data[jpgData.it + 1] = ig;
             jpgData.data[jpgData.it + 2] = ib;
