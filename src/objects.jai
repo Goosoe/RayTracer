@@ -5,7 +5,7 @@
 * Has functions and structs that allows the user to query the scene
 */
 
-MAX_DIST :: 100.0;
+MAX_DIST :: 300.0;
 MIN_DIST :: 0.0;
 
 Ray :: struct
@@ -77,16 +77,17 @@ checkSphereCollision :: (ray : Ray, center : Vector3, radius : float) -> bool, H
     {
         // IMPORTANT: negative calculations first
         root := (-b - (sqrt(discriminant) * it)) / a;
-        //verifies if the hit is in front of the camera
-        if root > MIN_DIST && root < MAX_DIST
+        //verifies if the hit is in front of the camera and is not too far away
+        if root <= MIN_DIST || root >= MAX_DIST
         {
-            hitCoord := pointAt(ray, root);
-            normal := (hitCoord - center) / radius;
-            frontFace := dot_product(ray.direction, normal) < 0;
-            // guarantees that the normal is outwards facing
-            if !frontFace then normal = -normal;
-            return true, HitData.{root, hitCoord, normal, frontFace};
+            continue;
         }
+        hitCoord := pointAt(ray, root);
+        normal := (hitCoord - center) / radius;
+        frontFace := dot_product(ray.direction, normal) < 0;
+        // guarantees that the normal is outwards facing
+        if !frontFace then normal = -normal;
+        return true, HitData.{root, hitCoord, normal, frontFace};
     }
     //root did not comply with defined dist values
     return false, HitData.{};

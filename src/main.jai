@@ -8,8 +8,8 @@
 #load "objects.jai";
 #load "renderer.jai";
 
-IMAGE_X :: 800;
-IMAGE_Y :: 600;
+IMAGE_X :: 400;
+IMAGE_Y :: 200;
 FILE_OUTPUT :: "out.jpg";
 
 // Helper for building the jpg
@@ -23,7 +23,7 @@ JPGData :: struct
 SPHERES := Sphere.[
     Sphere.{Vector3.{0, -100.5, -1}, 100},    // Big sphere to work as ground
     Sphere.{Vector3.{0, 0, -1}, 0.5},
-    Sphere.{Vector3.{1, 1, -3}, 0.5},
+    Sphere.{Vector3.{2, 2, -3}, 0.5},
 ];
 /**/
 
@@ -45,25 +45,7 @@ main :: ()
         for x: 0..IMAGE_X - 1
         {
             defer jpgData.it += JPG_CHANNELS;
-
-            coords := make_vector2(cast(float)x, cast(float)y);
-            #if ANTI_ALIASING
-            {
-                //TODO(Goose): the random should affect the UV, not the coords
-                color : Vector3;
-                for 0.. AA_SAMPLE_NUM
-                {
-                    random:= Vector2.{-0.5 + random_get_zero_to_one(), -0.5 + random_get_zero_to_one()};
-                    color += renderFragment(coords + random);
-                }
-                Clamp(*(color.x / AA_SAMPLE_NUM), 0, 1);
-                Clamp(*(color.y / AA_SAMPLE_NUM), 0, 1);
-                Clamp(*(color.z / AA_SAMPLE_NUM), 0, 1);
-            }
-            else
-            {
-                color := renderFragment(coords);
-            }
+            color := renderFragment(Vector2.{cast(float)x, cast(float)y});
             ir : u8 = cast(u8)(255.99 * color.x);
             ig : u8 = cast(u8)(255.99 * color.y);
             ib : u8 = cast(u8)(255.99 * color.z);
