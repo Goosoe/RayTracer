@@ -20,7 +20,24 @@ Sphere :: struct
 {
     center : Vector3;
     radius : float;
+    material : Materials;
+    materialId : int; // id in material array
 }
+
+Materials :: enum u8
+{
+    DIFFUSE :: 0;
+    METAL;
+    REFLECTIVE;
+    LIGHT;
+}
+
+/* Applies for Diffuse and Metal materials that use the true lambertian reflection algorithm*/
+LambertianData :: struct
+{
+    attenuation : Vector3;
+}
+
 
 HitData :: struct
 {

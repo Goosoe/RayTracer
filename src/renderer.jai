@@ -33,7 +33,7 @@ AA_SAMPLE_NUM :: 10;
 /* Viewport data */
 ASPECT_RATIO :: IMAGE_X / IMAGE_Y;
 // How much the viewport captures
-VIEWPORT_SIZE :: 3.0;
+VIEWPORT_SIZE :: 2;
 ZOOM :: 1;
 VIEWPORT_HEIGHT :: Vector3.{0.0, VIEWPORT_SIZE, 0.0};
 VIEWPORT_WIDTH :: Vector3.{VIEWPORT_SIZE * ASPECT_RATIO, 0.0, 0.0};
@@ -54,6 +54,7 @@ renderFragment :: (coords : Vector2) -> Vector3
     {
         // TODO(Goose): Put this in a function with the view guard to calculate the values properly
         uv, fragmentLocation := getCoordinateData(coords);
+        // uv = Vector2.{uv.x * ASPECT_RATIO, uv.y};
 
         ray := Ray.{
             CAMERA_LOCATION,
@@ -76,7 +77,7 @@ renderFragment :: (coords : Vector2) -> Vector3
         for 0 .. AA_SAMPLE_NUM - 1
         {
             random:= Vector2.{(-0.5 + random_get_zero_to_one()) / IMAGE_X, (-0.5 + random_get_zero_to_one())  / IMAGE_Y};
-            fragmentLocation := VIEWPORT_LOWER_LEFT + ((uv.x + random.x) * VIEWPORT_WIDTH) + ((uv.y + random.y)* VIEWPORT_HEIGHT);
+            fragmentLocation := VIEWPORT_LOWER_LEFT + (((uv.x) + random.x) * VIEWPORT_WIDTH) + ((uv.y + random.y)* VIEWPORT_HEIGHT);
             ray := Ray.{
                 CAMERA_LOCATION,
                 fragmentLocation - CAMERA_LOCATION
@@ -106,6 +107,7 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         // gets the closest hit value to print on the fragment by iterating over all objects and gets the closest
         hasHit := false;
         closestHit: HitData;
+        sphereHit : Sphere;
         for SPHERES
         {
             hit, hitData := checkSphereCollision(ray, it);
@@ -113,6 +115,7 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             {
                 hasHit = true;
                 closestHit = hitData;
+                sphereHit = it;
             }
             //shows normal color
         }
@@ -126,27 +129,40 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             {
                 // TODO(Goose): make calculations for various types of materials
                 /* Diffuse */
-                // direction := unit_vector(generateRandomVec3(-1.0, 1.0));
-                // direction := closestHit.normal + generateRandomInUnitSphere();
-                // print("%\n", closestHit.normal);
-                // make sure we get our direction against the surface it hit
-                // if dot_product(closestHit.normal, direction) < 0.0
-                // {
-                //     direction = -direction;
-                }
-                // print("% % %\n", closestHit.coordinates.x,closestHit.coordinates.y,closestHit.coordinates.z);
-                // print("% % %\n", direction.x,direction.y,direction.z);
-                nextRay := Ray.{
-                    closestHit.coordinates,
-                    closestHit.normal + generateRandomInUnitSphere()
-                };
+                if sphereHit.material ==
+                {
+                    case .DIFFUSE;
+                        //TODO(Goose): make this in a function 
+                        bounceDirection := closestHit.normal + generateRandomInUnitSphere();
+                        if nearZero(bounceDirection)
+                        {
+                            bounceDirection = closestHit.normal;
+                        }
+                        bounceRay := Ray.{
+                            closestHit.coordinates,
+                            closestHit.normal + generateRandomInUnitSphere() // scattered direction
+                        };
+                        return LAMBERTIAN_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
 
-                // TODO(Goose): 0.5 is a magic number...
-                return 0.8 * checkForCollisions(nextRay, currentDepth + 1);
+                    case .METAL;
+                        //TODO(Goose): make this in a function 
+                        reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, closestHit.normal)) * closestHit.normal);
+                        bounceRay := Ray.{
+                            closestHit.coordinates,
+                            reflectDirection
+                        };
+                        return LAMBERTIAN_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
+
+                    case .REFLECTIVE;
+                        print("Implement Reflective material");
+                    case .LIGHT;
+                        print("Implement Light material");
+                    }
+
+                    // TODO(Goose): 0.5 is a magic number...
             }
         }
     }
-
     /* Background colors */
     {
         rayDir := unit_vector(ray.direction);
@@ -171,8 +187,8 @@ getCoordinateData :: (coords : Vector2) -> Vector2, Vector3
     }
     else
     {
-        // TODO(Goose): Generate PERSPECTIVE VIEW
-        print("Perspective view not implemented. Implement me?");
+        // TODO(Goose): Generate ORTH VIEW
+        print("Orthogonal view not implemented. Implement me?");
 
     }
 }

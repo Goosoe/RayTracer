@@ -2,6 +2,7 @@
 #import "Math";
 #import "Random";
 
+/** Vector functions **/
 generateRandomVec3 :: () -> Vector3
 {
     return Vector3.{
@@ -34,4 +35,23 @@ generateRandomInUnitSphere :: () -> Vector3
             return unit_vector(res);
         }
     }
+    return Vector3.{0, 0, 0};
+}
+
+nearZero :: (vector : Vector3) -> bool
+{
+    NEAR_ZERO_VALUE :: 0.00001;
+    return vector.x < NEAR_ZERO_VALUE && vector.y < NEAR_ZERO_VALUE && vector.z < NEAR_ZERO_VALUE;
+}
+
+
+/** Gamma correction **/
+linearToGamma :: (component : Vector3) -> Vector3
+{
+    return Vector3.{sqrt(component.x), sqrt(component.y), sqrt(component.z)};
+}
+
+gammaToLinear :: (component : Vector3) -> Vector3
+{
+    return Vector3.{component.x * component.x , component.y * component.y, component.z * component.z};
 }

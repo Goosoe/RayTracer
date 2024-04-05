@@ -9,7 +9,7 @@
 #load "renderer.jai";
 
 IMAGE_X :: 800;
-IMAGE_Y :: 600;
+IMAGE_Y :: 400;
 FILE_OUTPUT :: "out.jpg";
 
 // Helper for building the jpg
@@ -21,9 +21,14 @@ JPGData :: struct
 
 /*scene data*/
 SPHERES := Sphere.[
-    Sphere.{Vector3.{0, -100.5, -1}, 100},    // Big sphere to work as ground
-    Sphere.{Vector3.{0, 0, -2}, 0.5},
-    Sphere.{Vector3.{2, 2, -4}, 0.5},
+    Sphere.{Vector3.{0, -100.5, -1}, 100, Materials.DIFFUSE, 2},    // Big sphere to work as ground
+    Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.METAL, 0},
+    Sphere.{Vector3.{2, 2, -2}, 0.5, Materials.DIFFUSE, 1},
+];
+LAMBERTIAN_DATA := LambertianData.[
+    LambertianData.{Vector3.{0.5, 0.5, 0.5}},
+    LambertianData.{Vector3.{0.8, 0.8, 0.8}},
+    LambertianData.{Vector3.{0.0, 0.9, 0.0}},
 ];
 /**/
 
@@ -46,6 +51,11 @@ main :: ()
         {
             defer jpgData.it += JPG_CHANNELS;
             color := renderFragment(Vector2.{cast(float)x, cast(float)y});
+
+
+            // Apply the linear to gamma transform.
+            color = linearToGamma(color);
+
             ir : u8 = cast(u8)(255.99 * color.x);
             ig : u8 = cast(u8)(255.99 * color.y);
             ib : u8 = cast(u8)(255.99 * color.z);
