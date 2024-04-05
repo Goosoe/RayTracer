@@ -5,8 +5,10 @@
 * Has functions and structs that allows the user to query the scene
 */
 
+/* Ray Data */
 MAX_DIST :: 300.0;
-MIN_DIST :: 0.0;
+// Using min_dist > 0 to avoid hits that are extremely close, solving shadow acne
+MIN_DIST :: 0.001;
 
 Ray :: struct
 {

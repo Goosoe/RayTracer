@@ -20,6 +20,12 @@ MAX_RAYS :: 50;
 /* Scene Data */
 ORIGIN :: Vector3.{0.0, 0.0, 0.0};
 
+// TODO(Goose): Investigate if camera location needs to be different than origin
+/* Camera Data */
+CAMERA_Z_LOCATION :: 0;
+CAMERA_LOCATION :: Vector3.{0,0, CAMERA_Z_LOCATION};
+
+
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
 AA_SAMPLE_NUM :: 10;
@@ -27,19 +33,16 @@ AA_SAMPLE_NUM :: 10;
 /* Viewport data */
 ASPECT_RATIO :: IMAGE_X / IMAGE_Y;
 // How much the viewport captures
-VIEWPORT_SIZE :: 2.0;
+VIEWPORT_SIZE :: 3.0;
 ZOOM :: 1;
 VIEWPORT_HEIGHT :: Vector3.{0.0, VIEWPORT_SIZE, 0.0};
 VIEWPORT_WIDTH :: Vector3.{VIEWPORT_SIZE * ASPECT_RATIO, 0.0, 0.0};
-VIEWPORT_LOWER_LEFT :: Vector3.{-VIEWPORT_SIZE * ASPECT_RATIO / 2, -VIEWPORT_SIZE / 2, -ZOOM};
+VIEWPORT_LOWER_LEFT :: Vector3.{-VIEWPORT_SIZE * ASPECT_RATIO / 2, -VIEWPORT_SIZE / 2, CAMERA_Z_LOCATION - ZOOM};
 /******/
 
-// TODO(Goose): Implement Perspective view
-ORTHOGONAL_VIEW:: true;
+// TODO(Goose): Implement ORTHO view
+PERSPECTIVE_VIEW:: true;
 
-// TODO(Goose): Investigate if camera location needs to be different than origin
-/* Camera Data */
-CAMERA_LOCATION :: Vector3.{0,0,0};
 
 /**
 * Verifies if there is a collision with an object at the given coordinates
@@ -47,7 +50,7 @@ CAMERA_LOCATION :: Vector3.{0,0,0};
 renderFragment :: (coords : Vector2) -> Vector3
 {
     /* Generate a ray */
-    #if ORTHOGONAL_VIEW
+    #if PERSPECTIVE_VIEW
     {
         // TODO(Goose): Put this in a function with the view guard to calculate the values properly
         uv, fragmentLocation := getCoordinateData(coords);
@@ -57,7 +60,7 @@ renderFragment :: (coords : Vector2) -> Vector3
             fragmentLocation - CAMERA_LOCATION
         };
     }
-    // TODO(Goose): Generate PERSPECTIVE VIEW
+    // TODO(Goose): Generate ORTHO VIEW
     else
     {
         print("Perspective view not implemented. Implement me?");
@@ -97,6 +100,7 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
     {
         if currentDepth >= MAX_RAYS
         {
+            // TODO(Goose): Magic number, change this
             return Vector3.{0, 0, 0};
         }
         // gets the closest hit value to print on the fragment by iterating over all objects and gets the closest
@@ -122,31 +126,32 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             {
                 // TODO(Goose): make calculations for various types of materials
                 /* Diffuse */
-                direction := unit_vector(generateRandomVec3(-1.0, 1.0));
-                // make sure we get our direction against the surface it hit
+                // direction := unit_vector(generateRandomVec3(-1.0, 1.0));
+                // direction := closestHit.normal + generateRandomInUnitSphere();
                 // print("%\n", closestHit.normal);
-                if dot_product(closestHit.normal, direction) < 0.0
-                {
-                    direction = -direction;
+                // make sure we get our direction against the surface it hit
+                // if dot_product(closestHit.normal, direction) < 0.0
+                // {
+                //     direction = -direction;
                 }
                 // print("% % %\n", closestHit.coordinates.x,closestHit.coordinates.y,closestHit.coordinates.z);
                 // print("% % %\n", direction.x,direction.y,direction.z);
                 nextRay := Ray.{
                     closestHit.coordinates,
-                    direction 
+                    closestHit.normal + generateRandomInUnitSphere()
                 };
 
                 // TODO(Goose): 0.5 is a magic number...
-                return 0.5 * checkForCollisions(nextRay, currentDepth + 1);
+                return 0.8 * checkForCollisions(nextRay, currentDepth + 1);
             }
         }
     }
 
     /* Background colors */
     {
-        unitDir := unit_vector(ray.direction);
+        rayDir := unit_vector(ray.direction);
         // transforms the direction to a positive value between [0,1]
-        coord := 0.5 * (unitDir.y + 1.0);
+        coord := 0.5 * (rayDir.y + 1.0);
         // applies the lerp
         //((1.0 - coord) * BACKGROUND_COLOR1) + (coord * BACKGROUND_COLOR2);
         // print("Bacground hit at depth: %\n", currentDepth);
@@ -157,7 +162,7 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
 /* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
 getCoordinateData :: (coords : Vector2) -> Vector2, Vector3
 {
-    #if ORTHOGONAL_VIEW
+    #if PERSPECTIVE_VIEW
     {
         uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
         fragmentLocation := VIEWPORT_LOWER_LEFT + (uv.x * VIEWPORT_WIDTH) + (uv.y * VIEWPORT_HEIGHT);

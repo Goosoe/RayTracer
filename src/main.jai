@@ -8,8 +8,8 @@
 #load "objects.jai";
 #load "renderer.jai";
 
-IMAGE_X :: 400;
-IMAGE_Y :: 200;
+IMAGE_X :: 800;
+IMAGE_Y :: 600;
 FILE_OUTPUT :: "out.jpg";
 
 // Helper for building the jpg
@@ -22,8 +22,8 @@ JPGData :: struct
 /*scene data*/
 SPHERES := Sphere.[
     Sphere.{Vector3.{0, -100.5, -1}, 100},    // Big sphere to work as ground
-    Sphere.{Vector3.{0, 0, -1}, 0.5},
-    Sphere.{Vector3.{2, 2, -3}, 0.5},
+    Sphere.{Vector3.{0, 0, -2}, 0.5},
+    Sphere.{Vector3.{2, 2, -4}, 0.5},
 ];
 /**/
 
