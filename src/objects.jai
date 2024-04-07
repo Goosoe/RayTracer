@@ -28,14 +28,25 @@ Materials :: enum u8
 {
     DIFFUSE :: 0;
     METAL;
-    REFLECTIVE;
+    DIELECTRIC; //Materials like water and glass
     LIGHT;
 }
 
-/* Applies for Diffuse and Metal materials that use the true lambertian reflection algorithm*/
-LambertianData :: struct
+DiffuseData :: struct
 {
     attenuation : Vector3;
+}
+
+MetalData :: struct
+{
+    attenuation : Vector3;
+    fuzz : float;
+}
+
+DielectricData :: struct
+{
+    attenuation : Vector3;
+    indexOfRefraction : float;
 }
 
 

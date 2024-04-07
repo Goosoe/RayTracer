@@ -28,7 +28,7 @@ CAMERA_LOCATION :: Vector3.{0,0, CAMERA_Z_LOCATION};
 
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
-AA_SAMPLE_NUM :: 10;
+AA_SAMPLE_NUM :: 15;
 
 /* Viewport data */
 ASPECT_RATIO :: IMAGE_X / IMAGE_Y;
@@ -106,61 +106,58 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         }
         // gets the closest hit value to print on the fragment by iterating over all objects and gets the closest
         hasHit := false;
-        closestHit: HitData;
+        hitData: HitData;
         sphereHit : Sphere;
         for SPHERES
         {
-            hit, hitData := checkSphereCollision(ray, it);
-            if hit && hitData.dist < closestHit.dist
+            hit, lastHitData := checkSphereCollision(ray, it);
+            if hit && lastHitData.dist < hitData.dist
             {
                 hasHit = true;
-                closestHit = hitData;
+                hitData = lastHitData;
                 sphereHit = it;
             }
             //shows normal color
         }
         if hasHit
         {
-            #if OUTPUT_NORMALS
-            {
-                return 0.5 * make_vector3(closestHit.normal.x + 1, closestHit.normal.y + 1, closestHit.normal.z + 1);
-            }
-            else
-            {
-                // TODO(Goose): make calculations for various types of materials
+#if OUTPUT_NORMALS
+{
+            return 0.5 * make_vector3(hitData.normal.x + 1, hitData.normal.y + 1, hitData.normal.z + 1);
+}
+else
+{
                 /* Diffuse */
-                if sphereHit.material ==
-                {
-                    case .DIFFUSE;
-                        //TODO(Goose): make this in a function 
-                        bounceDirection := closestHit.normal + generateRandomInUnitSphere();
-                        if nearZero(bounceDirection)
-                        {
-                            bounceDirection = closestHit.normal;
-                        }
-                        bounceRay := Ray.{
-                            closestHit.coordinates,
-                            closestHit.normal + generateRandomInUnitSphere() // scattered direction
-                        };
-                        return LAMBERTIAN_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
-
-                    case .METAL;
-                        //TODO(Goose): make this in a function 
-                        reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, closestHit.normal)) * closestHit.normal);
-                        bounceRay := Ray.{
-                            closestHit.coordinates,
-                            reflectDirection
-                        };
-                        return LAMBERTIAN_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
-
-                    case .REFLECTIVE;
-                        print("Implement Reflective material");
-                    case .LIGHT;
-                        print("Implement Light material");
+            if sphereHit.material ==
+            {
+                case .DIFFUSE;
+                    //TODO(Goose): make this a function?
+                    bounceDirection := hitData.normal + generateRandomInUnitSphere();
+                    if nearZero(bounceDirection)
+                    {
+                        bounceDirection = hitData.normal;
                     }
+                    bounceRay := Ray.{
+                        hitData.coordinates,
+                        hitData.normal + generateRandomInUnitSphere() // scattered direction
+                    };
+                    return DIFFUSE_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
 
-                    // TODO(Goose): 0.5 is a magic number...
-            }
+                case .METAL;
+                    //TODO(Goose): make this a function?
+                    reflectRay := getReflectRay(ray, hitData, sphereHit);
+                    return METAL_DATA[sphereHit.materialId].attenuation * checkForCollisions(reflectRay, currentDepth + 1);
+
+                case .DIELECTRIC;
+                     dielectricRay := getDielectricRay(ray, hitData, sphereHit);
+                    return DIELECTRIC_DATA[sphereHit.materialId].attenuation * checkForCollisions(dielectricRay, currentDepth + 1);
+                
+                case .LIGHT;
+                    print("Implement Light material");
+                }
+
+                // TODO(Goose): 0.5 is a magic number...
+}
         }
     }
     /* Background colors */
@@ -191,4 +188,73 @@ getCoordinateData :: (coords : Vector2) -> Vector2, Vector3
         print("Orthogonal view not implemented. Implement me?");
 
     }
+}
+
+getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+{
+    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
+
+    reflectRay := Ray.{
+        hitData.coordinates,
+        reflectDirection
+    };
+    if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+    {
+        reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+    }
+    return reflectRay;
+}
+
+getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, materialType : $T) -> Ray
+{
+    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
+
+    reflectRay := Ray.{
+        hitData.coordinates,
+        reflectDirection
+    };
+    #if T ==
+    {
+        case MetalData;
+            if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+            {
+                reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+            }
+            return reflectRay;
+
+        case DielectricData;
+            return reflectRay;
+
+        case;
+            assert(false, "ReflectRay of type: % is not implemented", materialType);
+            return Ray.{Vector3.{0,0,0}, Vector3.{0,0,0}};
+        }
+        assert(false, "Shouldn't have gotten here");
+}
+
+getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+{
+    refractionRatio := DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    assert(abs(refractionRatio) > 0.000001, "Index of Refraction cannot be 0, gotten index: %", refractionRatio);
+    if hitData.frontFace 
+    {
+        refractionRatio = 1.0 /  DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    }
+    unitDirection := unit_vector(ray.direction);
+
+    cosTheta := min(dot_product(-unitDirection, hitData.normal), 1.0);
+    sinTheta := sqrt(1.0 - cosTheta * cosTheta);
+    perpendicular := refractionRatio * (unitDirection + cosTheta * hitData.normal);
+    parallel := -sqrt(abs(1.0 - length_squared(perpendicular))) * hitData.normal;
+
+    if sinTheta * refractionRatio > 1.0
+    {
+        return getReflectRay(ray, hitData, sphereHit, DielectricData);
+    }
+
+    return Ray.{
+        hitData.coordinates,
+        parallel + perpendicular
+    };
+
 }

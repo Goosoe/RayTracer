@@ -41,7 +41,7 @@ generateRandomInUnitSphere :: () -> Vector3
 nearZero :: (vector : Vector3) -> bool
 {
     NEAR_ZERO_VALUE :: 0.00001;
-    return vector.x < NEAR_ZERO_VALUE && vector.y < NEAR_ZERO_VALUE && vector.z < NEAR_ZERO_VALUE;
+    return abs(vector.x) < NEAR_ZERO_VALUE && abs(vector.y) < NEAR_ZERO_VALUE && abs(vector.z) < NEAR_ZERO_VALUE;
 }
 
 

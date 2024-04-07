@@ -21,14 +21,27 @@ JPGData :: struct
 
 /*scene data*/
 SPHERES := Sphere.[
-    Sphere.{Vector3.{0, -100.5, -1}, 100, Materials.DIFFUSE, 2},    // Big sphere to work as ground
-    Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.METAL, 0},
-    Sphere.{Vector3.{2, 2, -2}, 0.5, Materials.DIFFUSE, 1},
+    Sphere.{Vector3.{0, -100.5, -1}, 100, Materials.DIFFUSE, 1},    // Big sphere to work as ground
+    Sphere.{Vector3.{1.5, 0, -1}, 0.5, Materials.DIELECTRIC, 0},
+    Sphere.{Vector3.{-1.5, 0, -1}, 0.5, Materials.METAL, 0},
+    // Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 0},
+    Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 1},
 ];
-LAMBERTIAN_DATA := LambertianData.[
-    LambertianData.{Vector3.{0.5, 0.5, 0.5}},
-    LambertianData.{Vector3.{0.8, 0.8, 0.8}},
-    LambertianData.{Vector3.{0.0, 0.9, 0.0}},
+
+DIFFUSE_DATA := DiffuseData.[
+    DiffuseData.{Vector3.{0.5, 0.5, 0.5}},
+    DiffuseData.{Vector3.{0.8, 0.8, 0.0}},
+    DiffuseData.{Vector3.{0.2, 0.7, 0.2}},
+];
+
+METAL_DATA := MetalData.[
+    MetalData.{Vector3.{0.2, 0.2, 0.2}, 0},  //pure reflective metal
+    MetalData.{Vector3.{0.2, 0.2, 0.2}, 0.5},  //fuzzy metal
+];
+
+DIELECTRIC_DATA := DielectricData.[
+    DielectricData.{Vector3.{1,1,1}, 1.5},
+    DielectricData.{Vector3.{0.5,0.5,0.5}, 1.0},
 ];
 /**/
 
