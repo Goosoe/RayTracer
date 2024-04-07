@@ -8,8 +8,8 @@
 #load "objects.jai";
 #load "renderer.jai";
 
-IMAGE_X :: 800;
-IMAGE_Y :: 400;
+IMAGE_X :: 1000;
+IMAGE_Y :: 500;
 FILE_OUTPUT :: "out.jpg";
 
 // Helper for building the jpg
@@ -24,8 +24,7 @@ SPHERES := Sphere.[
     Sphere.{Vector3.{0, -100.5, -1}, 100, Materials.DIFFUSE, 1},    // Big sphere to work as ground
     Sphere.{Vector3.{1.5, 0, -1}, 0.5, Materials.DIELECTRIC, 0},
     Sphere.{Vector3.{-1.5, 0, -1}, 0.5, Materials.METAL, 0},
-    // Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 0},
-    Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 1},
+    Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 0},
 ];
 
 DIFFUSE_DATA := DiffuseData.[

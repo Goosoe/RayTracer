@@ -205,7 +205,7 @@ getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
     return reflectRay;
 }
 
-getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, materialType : $T) -> Ray
+getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -> Ray
 {
     reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
 
@@ -247,14 +247,18 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
     perpendicular := refractionRatio * (unitDirection + cosTheta * hitData.normal);
     parallel := -sqrt(abs(1.0 - length_squared(perpendicular))) * hitData.normal;
 
-    if sinTheta * refractionRatio > 1.0
-    {
-        return getReflectRay(ray, hitData, sphereHit, DielectricData);
-    }
+    // Use Schlick's approximation for reflectance. It gives a chance for reflecting instead of always refracting
+     r0 := (1 - refractionRatio) / (1 + refractionRatio);
+     r0 = r0 * r0;
+     reflectance := r0 + (1 - r0) * pow((1 - cosTheta), 5);
+
+     if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
+     {
+         return getReflectRay(ray, hitData, sphereHit, DielectricData);
+     }
 
     return Ray.{
         hitData.coordinates,
         parallel + perpendicular
     };
-
 }
