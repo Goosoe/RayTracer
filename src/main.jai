@@ -8,8 +8,8 @@
 #load "objects.jai";
 #load "renderer.jai";
 
-IMAGE_X :: 1000;
-IMAGE_Y :: 500;
+IMAGE_X :: 1960;
+IMAGE_Y :: 1080;
 FILE_OUTPUT :: "out.jpg";
 
 // Helper for building the jpg
@@ -20,10 +20,13 @@ JPGData :: struct
 };
 
 /*scene data*/
-SPHERES := Sphere.[
+SPHERES :: Sphere.[
     Sphere.{Vector3.{0, -100.5, -1}, 100, Materials.DIFFUSE, 1},    // Big sphere to work as ground
     Sphere.{Vector3.{1.5, 0, -1}, 0.5, Materials.DIELECTRIC, 0},
+    // Sphere.{Vector3.{1.5, 0, -1}, 0.5, Materials.DIELECTRIC, 0},
     Sphere.{Vector3.{-1.5, 0, -1}, 0.5, Materials.METAL, 0},
+    // Sphere.{Vector3.{1.5, 0, -1}, 0.5, Materials.DIFFUSE, 0},
+    // Sphere.{Vector3.{-1.5, 0, -1}, 0.5, Materials.DIFFUSE, 0},
     Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 0},
 ];
 
@@ -40,7 +43,6 @@ METAL_DATA := MetalData.[
 
 DIELECTRIC_DATA := DielectricData.[
     DielectricData.{Vector3.{1,1,1}, 1.5},
-    DielectricData.{Vector3.{0.5,0.5,0.5}, 1.0},
 ];
 /**/
 
@@ -49,16 +51,19 @@ DIELECTRIC_DATA := DielectricData.[
 */
 main :: ()
 {
+    setupCamera();
     // not deallocating because it is needed for the whole runtime of the program
     jpgData : *JPGData = cast(*JPGData)alloc(size_of(JPGData));
     // or
     // jpgData := New(JPGData);
     assert(IMAGE_X >= 100, "Image witdth must be > 100");
     assert(IMAGE_Y >= 100, "Image length must be > 100");
-    assert(ZOOM > 0, "Zoom must be > 0");
+
+    print("Image resolution: %x%\n", IMAGE_X, IMAGE_Y);
 
     for < y: IMAGE_Y - 1..0
     {
+        print("Completed %/% rows\n", IMAGE_Y - y, IMAGE_Y);
         for x: 0..IMAGE_X - 1
         {
             defer jpgData.it += JPG_CHANNELS;
@@ -79,4 +84,5 @@ main :: ()
     }
     // writes the fragment data into FILE_OUTPUT
     stbi_write_jpg(FILE_OUTPUT, IMAGE_X, IMAGE_Y, JPG_CHANNELS, *jpgData.data, 100);
+    print("Rendering complete, outputted file: %", FILE_OUTPUT);
 }

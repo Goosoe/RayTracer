@@ -15,33 +15,40 @@ GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
 
 /* Render Data */
-MAX_RAYS :: 50;
+MAX_RAYS :: 100;
 
 /* Scene Data */
-ORIGIN :: Vector3.{0.0, 0.0, 0.0};
+// ORIGIN :: Vector3.{0.0, 0.0, 0.0};
 
-// TODO(Goose): Investigate if camera location needs to be different than origin
 /* Camera Data */
-CAMERA_Z_LOCATION :: 0;
-CAMERA_LOCATION :: Vector3.{0,0, CAMERA_Z_LOCATION};
+CAMERA_LOCATION :: Vector3.{-2, 2, 1};
+CAMERA_LOOK_AT :: Vector3.{0, 0, -1};
+CAMERA_UP :: Vector3.{0, 1, 0};
+// Vertical Degrees
+FOV :: 90;
 
+Camera :: struct
+{
+    // viewportSize : float;
+    viewportHeight : Vector3;
+    viewportWidth : Vector3;
+    viewportLowerLeft : Vector3;
+}
+
+camera : Camera;
 
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
 AA_SAMPLE_NUM :: 15;
 
 /* Viewport data */
-ASPECT_RATIO :: IMAGE_X / IMAGE_Y;
+ASPECT_RATIO :: cast(float)IMAGE_X / cast(float)IMAGE_Y;
+// rad = deg * (pi / 180)
+// viewport size =  2 * tan(rad / 2) * zoom
 // How much the viewport captures
-VIEWPORT_SIZE :: 2;
-ZOOM :: 1;
-VIEWPORT_HEIGHT :: Vector3.{0.0, VIEWPORT_SIZE, 0.0};
-VIEWPORT_WIDTH :: Vector3.{VIEWPORT_SIZE * ASPECT_RATIO, 0.0, 0.0};
-VIEWPORT_LOWER_LEFT :: Vector3.{-VIEWPORT_SIZE * ASPECT_RATIO / 2, -VIEWPORT_SIZE / 2, CAMERA_Z_LOCATION - ZOOM};
+//TODO(Goose): Add zoom?
+// ZOOM :: 1;
 /******/
-
-// TODO(Goose): Implement ORTHO view
-PERSPECTIVE_VIEW:: true;
 
 
 /**
@@ -50,46 +57,28 @@ PERSPECTIVE_VIEW:: true;
 renderFragment :: (coords : Vector2) -> Vector3
 {
     /* Generate a ray */
-    #if PERSPECTIVE_VIEW
-    {
-        // TODO(Goose): Put this in a function with the view guard to calculate the values properly
-        uv, fragmentLocation := getCoordinateData(coords);
-        // uv = Vector2.{uv.x * ASPECT_RATIO, uv.y};
-
-        ray := Ray.{
-            CAMERA_LOCATION,
-            fragmentLocation - CAMERA_LOCATION
-        };
-    }
-    // TODO(Goose): Generate ORTHO VIEW
-    else
-    {
-        print("Perspective view not implemented. Implement me?");
-        return Vector3.{0, 0, 0};
-    }
-
-    /* Use Ray to see if it collides with anything in the defined scene, returns the color of the object hit*/
     #if ANTI_ALIASING
     {
         color := Vector3.{0, 0, 0};
-        color += checkForCollisions(ray);
         // Randomizes a value around the original uv
         for 0 .. AA_SAMPLE_NUM - 1
         {
-            random:= Vector2.{(-0.5 + random_get_zero_to_one()) / IMAGE_X, (-0.5 + random_get_zero_to_one())  / IMAGE_Y};
-            fragmentLocation := VIEWPORT_LOWER_LEFT + (((uv.x) + random.x) * VIEWPORT_WIDTH) + ((uv.y + random.y)* VIEWPORT_HEIGHT);
+            fragmentLocation := getRandomAdjacentCoordinate(coords);
             ray := Ray.{
                 CAMERA_LOCATION,
                 fragmentLocation - CAMERA_LOCATION
             };
             color += checkForCollisions(ray);
         }
-        // Samples + Original value 
-        return color / (AA_SAMPLE_NUM + 1);
-        // print ("Color % % % \n", color.x,color.y,color.z);
+        return color / (AA_SAMPLE_NUM);
     }
     else
     {
+        fragmentLocation := getCoordinate(coords);
+        ray := Ray.{
+            CAMERA_LOCATION,
+            fragmentLocation - CAMERA_LOCATION
+        };
         return checkForCollisions(ray);
     }
 }
@@ -155,8 +144,6 @@ else
                 case .LIGHT;
                     print("Implement Light material");
                 }
-
-                // TODO(Goose): 0.5 is a magic number...
 }
         }
     }
@@ -173,21 +160,20 @@ else
 }
 
 /* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
-getCoordinateData :: (coords : Vector2) -> Vector2, Vector3
+getRandomAdjacentCoordinate :: (coords : Vector2) -> Vector3
 {
-    #if PERSPECTIVE_VIEW
-    {
-        uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
-        fragmentLocation := VIEWPORT_LOWER_LEFT + (uv.x * VIEWPORT_WIDTH) + (uv.y * VIEWPORT_HEIGHT);
-        return uv, fragmentLocation;
+    uvOffset := Vector2.{(-0.5 + random_get_zero_to_one()) / IMAGE_X, (-0.5 + random_get_zero_to_one())  / IMAGE_Y};
+    uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
+    fragmentLocation := camera.viewportLowerLeft + ((uv.x  + uvOffset.x) * camera.viewportWidth) + ((uv.y + uvOffset.y) * camera.viewportHeight);
+    return fragmentLocation;
+}
 
-    }
-    else
-    {
-        // TODO(Goose): Generate ORTH VIEW
-        print("Orthogonal view not implemented. Implement me?");
-
-    }
+/* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
+getCoordinate :: (coords : Vector2) -> Vector3
+{
+    uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
+    fragmentLocation := camera.viewportLowerLeft + (uv.x * camera.viewportWidth) + (uv.y * camera.viewportHeight);
+    return fragmentLocation;
 }
 
 getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
@@ -250,7 +236,7 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
     // Use Schlick's approximation for reflectance. It gives a chance for reflecting instead of always refracting
      r0 := (1 - refractionRatio) / (1 + refractionRatio);
      r0 = r0 * r0;
-     reflectance := r0 + (1 - r0) * pow((1 - cosTheta), 5);
+     reflectance := r0 + ((1 - r0) * pow((1 - cosTheta), 5));
 
      if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
      {
@@ -261,4 +247,24 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
         hitData.coordinates,
         parallel + perpendicular
     };
+}
+
+setupCamera :: () 
+{
+    focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
+    viewportHeight := 2 * tan(FOV * PI / 360) * focalLength;
+    viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};
+    w := unit_vector(CAMERA_LOCATION - CAMERA_LOOK_AT);
+    u := unit_vector(cross_product(CAMERA_UP, w));
+    v := cross_product(w, u);
+    viewportU := viewportSize.x * u;
+    viewportV := viewportSize.y * v;
+    lowerLeft := CAMERA_LOCATION - (focalLength * w) - (viewportU / 2) - (viewportV / 2);
+
+    camera = Camera.{
+        viewportV,
+        viewportU,
+        lowerLeft
+    };
+    print("Camera set up! Current aspect ratio: %\n", ASPECT_RATIO);
 }
