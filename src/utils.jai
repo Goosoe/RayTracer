@@ -21,6 +21,22 @@ generateRandomVec3 :: (min : float, max : float) -> Vector3
     };
 }
 
+generateRandomInUnitCircle :: () -> Vector3
+{
+    while true
+    {
+        res := Vector3.{
+            random_get_within_range(0, 1),
+            random_get_within_range(0, 1),
+            0
+        };
+        if length_squared(res) < 1.0
+        {
+            return unit_vector(res);
+        }
+    }
+    return Vector3.{0, 0, 0};
+}
 generateRandomInUnitSphere :: () -> Vector3
 {
     while true
@@ -54,4 +70,14 @@ linearToGamma :: (component : Vector3) -> Vector3
 gammaToLinear :: (component : Vector3) -> Vector3
 {
     return Vector3.{component.x * component.x , component.y * component.y, component.z * component.z};
+}
+
+radiansToDegree :: (radians : float) -> float
+{
+    return radians * 180 / PI;
+}
+
+degreeToRadian :: (degrees : float) -> float
+{
+    return degrees * PI / 180; 
 }

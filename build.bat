@@ -14,7 +14,7 @@ if "%1"=="clean" (
 
     echo Running %build_type%...
     jai build.jai - %build_type% && bin\%build_type%\%exe_name%
-    CactusViewer.exe %~dp0\%out_name%
+    .\%out_name%
 
 ) else if "%1"=="run" (
 

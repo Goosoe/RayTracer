@@ -15,31 +15,25 @@ GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
 
 /* Render Data */
-MAX_RAYS :: 100;
+MAX_RAYS :: 10;
 
 /* Scene Data */
 // ORIGIN :: Vector3.{0.0, 0.0, 0.0};
 
 /* Camera Data */
-CAMERA_LOCATION :: Vector3.{-2, 2, 1};
-CAMERA_LOOK_AT :: Vector3.{0, 0, -1};
+CAMERA_LOCATION :: Vector3.{13, 2, 3};
+CAMERA_LOOK_AT :: Vector3.{0, 0, 0};
 CAMERA_UP :: Vector3.{0, 1, 0};
+CAMERA_DEFOCUS_ANGLE :: 0.0;
+CAMERA_FOCUS_DIST :: 1;
+// or defocus blur
+//DEPTH_OF_FIELD :: Vector3.{0, 1, 0};
 // Vertical Degrees
-FOV :: 90;
-
-Camera :: struct
-{
-    // viewportSize : float;
-    viewportHeight : Vector3;
-    viewportWidth : Vector3;
-    viewportLowerLeft : Vector3;
-}
-
-camera : Camera;
+FOV :: 20;
 
 /* Anti-Aliasing */
-ANTI_ALIASING :: true;
-AA_SAMPLE_NUM :: 15;
+ANTI_ALIASING :: false;
+AA_SAMPLE_NUM :: 100;
 
 /* Viewport data */
 ASPECT_RATIO :: cast(float)IMAGE_X / cast(float)IMAGE_Y;
@@ -49,6 +43,18 @@ ASPECT_RATIO :: cast(float)IMAGE_X / cast(float)IMAGE_Y;
 //TODO(Goose): Add zoom?
 // ZOOM :: 1;
 /******/
+
+Camera :: struct
+{
+    // viewportSize : float;
+    viewportHeight : Vector3;
+    viewportWidth : Vector3;
+    viewportLowerLeft : Vector3;
+    defocusDiskU : Vector3;
+    defocusDiskV : Vector3;
+}
+
+camera : Camera;
 
 
 /**
@@ -64,9 +70,14 @@ renderFragment :: (coords : Vector2) -> Vector3
         for 0 .. AA_SAMPLE_NUM - 1
         {
             fragmentLocation := getRandomAdjacentCoordinate(coords);
+            point := CAMERA_LOCATION;
+            if CAMERA_DEFOCUS_ANGLE > 0
+            {
+                point = sampleDefocusDisk();
+            }
             ray := Ray.{
-                CAMERA_LOCATION,
-                fragmentLocation - CAMERA_LOCATION
+                point,
+                fragmentLocation - point
             };
             color += checkForCollisions(ray);
         }
@@ -199,6 +210,7 @@ getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -
         hitData.coordinates,
         reflectDirection
     };
+
     #if T ==
     {
         case MetalData;
@@ -251,20 +263,32 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
 
 setupCamera :: () 
 {
-    focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
-    viewportHeight := 2 * tan(FOV * PI / 360) * focalLength;
+    // focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
+    viewportHeight := 2 * tan(degreeToRadian(FOV) / 2) * CAMERA_FOCUS_DIST;
     viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};
     w := unit_vector(CAMERA_LOCATION - CAMERA_LOOK_AT);
     u := unit_vector(cross_product(CAMERA_UP, w));
     v := cross_product(w, u);
     viewportU := viewportSize.x * u;
     viewportV := viewportSize.y * v;
-    lowerLeft := CAMERA_LOCATION - (focalLength * w) - (viewportU / 2) - (viewportV / 2);
+    lowerLeft := CAMERA_LOCATION - (CAMERA_FOCUS_DIST * w) - (viewportU / 2) - (viewportV / 2);
+    
+    defocusRadius := CAMERA_FOCUS_DIST * tan(degreeToRadian(CAMERA_DEFOCUS_ANGLE / 2));
+    defocusDiskU := u * defocusRadius;
+    defocusDiskV := v * defocusRadius;
 
     camera = Camera.{
         viewportV,
         viewportU,
-        lowerLeft
+        lowerLeft,
+        defocusDiskU,
+        defocusDiskV
     };
     print("Camera set up! Current aspect ratio: %\n", ASPECT_RATIO);
+}
+
+sampleDefocusDisk :: () -> Vector3
+{
+    point := generateRandomInUnitCircle();
+    return CAMERA_LOCATION + (point.x * camera.defocusDiskU) + (point.y * camera.defocusDiskV);
 }
