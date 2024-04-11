@@ -8,14 +8,14 @@ JPG_CHANNELS :: 3;
 OUTPUT_NORMALS :: false;
 
 /* Color Data */
-BACKGROUND_COLOR1 :: Vector3.{1.0, 1.0, 1.0};
+BACKGROUND_COLOR1 :: Vector3.{0.8, 0.8, 0.8};
 BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
 RED :: Vector3.{1, 0, 0};
 GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
 
 /* Render Data */
-MAX_RAYS :: 10;
+MAX_RAYS :: 100;
 
 /* Scene Data */
 // ORIGIN :: Vector3.{0.0, 0.0, 0.0};
@@ -32,7 +32,7 @@ CAMERA_FOCUS_DIST :: 1;
 FOV :: 20;
 
 /* Anti-Aliasing */
-ANTI_ALIASING :: false;
+ANTI_ALIASING :: true;
 AA_SAMPLE_NUM :: 100;
 
 /* Viewport data */
@@ -56,6 +56,23 @@ Camera :: struct
 
 camera : Camera;
 
+renderFragmentThread :: (group: *Thread_Group, thread: *Thread, work: *void) -> Thread_Continue_Status 
+{
+    fragmentData := cast(*FragmentData) work;
+    color := renderFragment(fragmentData.coords);
+    
+    color = linearToGamma(color);
+
+    ir : u8 = cast(u8)(255.99 * color.x);
+    ig : u8 = cast(u8)(255.99 * color.y);
+    ib : u8 = cast(u8)(255.99 * color.z);
+
+    // No need to syncrhonize writes on this memory as there won't be any concurrent writing/reading 
+    jpgData.data[fragmentData.jpgDataPos] = ir;
+    jpgData.data[fragmentData.jpgDataPos + 1] = ig;
+    jpgData.data[fragmentData.jpgDataPos + 2] = ib;
+    return .CONTINUE;
+}
 
 /**
 * Verifies if there is a collision with an object at the given coordinates

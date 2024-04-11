@@ -1,55 +1,54 @@
 #import "Basic";
-#import "Math";
 #import "File";
 #import "File_Utilities";
+#import "Math";
+#import "Pool";
 #import "Random";
+#import "System";
+#import "Thread";
 #import "stb_image_write";
 
 #load "objects.jai";
 #load "renderer.jai";
 
-IMAGE_X :: 800;
-IMAGE_Y :: 400;
+IMAGE_X :: 1920;
+IMAGE_Y :: 1080;
+IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
+MULTI_THREAD :: true;
+NUM_THREADS :: 10;
+NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
 FILE_OUTPUT :: "out.jpg";
 
 // Helper for building the jpg
 JPGData :: struct
 {
-    data: [IMAGE_X * IMAGE_Y * JPG_CHANNELS] u8;
+    data: [IMAGE_DATA_SIZE] u8;
     it := 0;
 };
 
+// Struct for the multi threaded renderer
+FragmentData :: struct
+{
+    // Coords of the fragment to sample
+    coords : Vector2;
+    // Position to write the color obtained
+    jpgDataPos : int;
+}
+
 /*scene data*/
 SPHERES : [..]  Sphere;
-//[
-//    Sphere.{Vector3.{0, -100.5, -1}, 100, Materials.DIFFUSE, 0},    // Big sphere to work as ground
-//    // Sphere.{Vector3.{1, 0, -1}, 0.5, Materials.DIFFUSE, 2},
-//    // Sphere.{Vector3.{1, 0, -1}, 0.5, Materials.DIELECTRIC, 0},
-//    // Sphere.{Vector3.{-1, 0, -1}, 0.5, Materials.METAL, 0},
-//    // Sphere.{Vector3.{1.5, 0, -1}, 0.5, Materials.DIFFUSE, 0},
-//    // Sphere.{Vector3.{-1.5, 0, -1}, 0.5, Materials.DIFFUSE, 0},
-//    // Sphere.{Vector3.{0, 0, -1}, 0.5, Materials.DIFFUSE, 0},
-//];
 
 DIFFUSE_DATA : [..] DiffuseData;
-// .[
-//     DiffuseData.{Vector3.{0.5, 0.5, 0.5}},
-//     DiffuseData.{Vector3.{0.8, 0.8, 0.0}},
-//     DiffuseData.{Vector3.{0.2, 0.7, 0.2}},
-// ];
 
 METAL_DATA : [..]  MetalData;
-// .[
-//     MetalData.{Vector3.{0.2, 0.2, 0.2}, 0},  //pure reflective metal
-//     MetalData.{Vector3.{0.2, 0.2, 0.2}, 0.5},  //fuzzy metal
-// ];
 
 DIELECTRIC_DATA : [..] DielectricData;
-// .[
-//     DielectricData.{Vector3.{1,1,1}, 1.5},
-// ];
-/**/
 
+
+threadGroup: Thread_Group;
+pool: Pool;
+
+jpgData : *JPGData;
 /*
 * Initializes data and requests data per pixel of the image. Outputs an image a .jpg in the end
 */
@@ -57,8 +56,20 @@ main :: ()
 {
     setupCamera();
     setupMap();
+    setupThreadGroup();
+#if MULTI_THREAD
+{
+    start(*threadGroup);
+    set_allocators(*pool);  // Init the Pool to use context.allocator.
+    allocator: Allocator;
+    allocator.proc = pool_allocator_proc;
+    allocator.data = *pool;
+}
+
+    for 1..IMAGE_DATA_SIZE {
+}
     // not deallocating because it is needed for the whole runtime of the program
-    jpgData : *JPGData = cast(*JPGData)alloc(size_of(JPGData));
+    jpgData = cast(*JPGData)alloc(size_of(JPGData));
     // or
     // jpgData := New(JPGData);
     assert(IMAGE_X >= 100, "Image witdth must be > 100");
@@ -66,11 +77,23 @@ main :: ()
 
     print("Image resolution: %x%\n", IMAGE_X, IMAGE_Y);
 
+    startTime := current_time_consensus();
+
     for < y: IMAGE_Y - 1..0
     {
-        print("Completed %/% rows\n", IMAGE_Y - y, IMAGE_Y);
         for x: 0..IMAGE_X - 1
         {
+#if MULTI_THREAD
+{
+        defer jpgData.it += JPG_CHANNELS;
+        fragmentData := New(FragmentData,, allocator);
+        fragmentData.coords = Vector2.{cast(float)x, cast(float)y};
+        fragmentData.jpgDataPos = jpgData.it; 
+        add_work(*threadGroup, fragmentData, tprint("Work item %", jpgData.it));
+
+}
+else
+{
             defer jpgData.it += JPG_CHANNELS;
             color := renderFragment(Vector2.{cast(float)x, cast(float)y});
 
@@ -85,11 +108,49 @@ main :: ()
             jpgData.data[jpgData.it] = ir;
             jpgData.data[jpgData.it + 1] = ig;
             jpgData.data[jpgData.it + 2] = ib;
+}
         }
     }
+
+    workFinished : s64 = 0;
+    // When we are done, we shut down the Thread_Group. This is a blocking wait call
+    while (workFinished < NUM_WORK)
+    {
+        sleep_milliseconds(200);
+        
+        results := get_completed_work(*threadGroup);
+        workFinished += results.count;
+        print("%\% \n", cast(int)((cast(float)(workFinished) / cast(float)NUM_WORK) * 100));
+        reset_temporary_storage();
+    }
+    endTime := current_time_consensus();
+    print("Time elapsed: % seconds\n", to_seconds(endTime - startTime)); 
+
+    shutdown(*threadGroup);
     // writes the fragment data into FILE_OUTPUT
     stbi_write_jpg(FILE_OUTPUT, IMAGE_X, IMAGE_Y, JPG_CHANNELS, *jpgData.data, 100);
     print("Rendering complete, outputted file: %", FILE_OUTPUT);
+}
+
+setupThreadGroup :: ()
+{
+    numCpus := get_number_of_processors();
+    assert(numCpus >= 1);
+    if numCpus > 200  numCpus = 200;  // Clamp to a value that is reasonable as of 2021, in case we get weird data.
+    // This is needed if you have an Intel
+   // #if (OS == .WINDOWS) || (OS == .LINUX) {
+   //     // This routine reports hyperthreads, so, divide by two, because of Intel marketing.
+   //     num_cpus /= 2;
+   // }
+
+   // to leave a thread available for main
+    numThreads := min(numCpus - 1, NUM_THREADS);
+    log("This machine reports % CPUs; starting % threads.\n", numCpus, numThreads);
+
+    init(*threadGroup, numThreads, renderFragmentThread);
+    threadGroup.name    = "RayCast";
+    threadGroup.logging = false;
+
 }
 
 setupMap :: () 
