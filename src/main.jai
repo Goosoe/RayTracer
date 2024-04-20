@@ -11,8 +11,8 @@
 #load "objects.jai";
 #load "renderer.jai";
 
-IMAGE_X :: 1920;
-IMAGE_Y :: 1080;
+IMAGE_X :: 400;
+IMAGE_Y :: 200;
 IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
 MULTI_THREAD :: true;
 NUM_THREADS :: 10;
@@ -55,7 +55,7 @@ jpgData : *JPGData;
 main :: ()
 {
     setupCamera();
-    setupMap();
+    setupMap1();
     setupThreadGroup();
 #if MULTI_THREAD
 {
@@ -66,8 +66,6 @@ main :: ()
     allocator.data = *pool;
 }
 
-    for 1..IMAGE_DATA_SIZE {
-}
     // not deallocating because it is needed for the whole runtime of the program
     jpgData = cast(*JPGData)alloc(size_of(JPGData));
     // or
@@ -96,7 +94,6 @@ else
 {
             defer jpgData.it += JPG_CHANNELS;
             color := renderFragment(Vector2.{cast(float)x, cast(float)y});
-
 
             // Apply the linear to gamma transform.
             color = linearToGamma(color);
@@ -153,14 +150,15 @@ setupThreadGroup :: ()
 
 }
 
-setupMap :: () 
+setupMap1 :: () 
 {
+    // Static location of spheres
     array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
     array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, Materials.DIFFUSE, 1});
     array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, Materials.DIELECTRIC, 0});
     array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, Materials.METAL, 0});
    
-   
+    // Random location of spheres
    
     array_add(*DIELECTRIC_DATA, DielectricData.{Vector3.{1,1,1}, 1.5});
     array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});

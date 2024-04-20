@@ -14,6 +14,7 @@ Ray :: struct
 {
     origin : Vector3;
     direction : Vector3;
+    // time : float;
 }
 
 Sphere :: struct

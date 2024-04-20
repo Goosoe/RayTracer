@@ -1,4 +1,4 @@
-REM @eIMAGE_X, IMAGE_Ycho off
+REM @echo off
 
 setlocal
 set build_type=%2%
