@@ -1,7 +1,9 @@
 #import "Basic";
 #import "Math";
+#import "Random";
 
 #load "utils.jai";
+#load "sphere.jai";
 
 /* Output Data */
 JPG_CHANNELS :: 3;
@@ -13,7 +15,12 @@ BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
 RED :: Vector3.{1, 0, 0};
 GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
+BLACK :: Vector3.{0, 0, 0};
 
+/* Motion blur */
+//For how long the shutter will stay "open". It will go from [0.0, SHUTTER_TIME]
+MOTION_BLUR :: false;
+SHUTTER_TIME :: 0.8;
 /* Render Data */
 MAX_RAYS :: 100;
 
@@ -21,15 +28,16 @@ MAX_RAYS :: 100;
 // ORIGIN :: Vector3.{0.0, 0.0, 0.0};
 
 /* Camera Data */
-CAMERA_LOCATION :: Vector3.{13, 2, 3};
+CAMERA_LOCATION :: Vector3.{3, 2, 3};
 CAMERA_LOOK_AT :: Vector3.{0, 0, 0};
 CAMERA_UP :: Vector3.{0, 1, 0};
+// Set this to 0 to not have defocus
 CAMERA_DEFOCUS_ANGLE :: 0.0;
 CAMERA_FOCUS_DIST :: 1;
 // or defocus blur
 //DEPTH_OF_FIELD :: Vector3.{0, 1, 0};
 // Vertical Degrees
-FOV :: 20;
+FOV :: 90;
 
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
@@ -44,6 +52,7 @@ ASPECT_RATIO :: cast(float)IMAGE_X / cast(float)IMAGE_Y;
 // ZOOM :: 1;
 /******/
 
+/** CAMERA **/
 Camera :: struct
 {
     // viewportSize : float;
@@ -53,9 +62,28 @@ Camera :: struct
     defocusDiskU : Vector3;
     defocusDiskV : Vector3;
 }
-
 camera : Camera;
 
+/** RAY **/
+MAX_DIST :: 300.0;
+// Using min_dist > 0 to avoid hits that are extremely close, solving shadow acne
+MIN_DIST :: 0.001;
+
+Ray :: struct
+{
+    origin : Vector3;
+    direction : Vector3;
+    // time of the shutter when ray is created. Used to simulate movement and thus, motion blur 
+    shutterTime : float = 0;
+}
+
+pointAt :: (ray : Ray, point : float) -> Vector3
+{
+    return ray.origin + (point * ray.direction);
+}
+
+
+/** MULTI-THREADED VARIANT **/
 renderFragmentThread :: (group: *Thread_Group, thread: *Thread, work: *void) -> Thread_Continue_Status 
 {
     fragmentData := cast(*FragmentData) work;
@@ -73,12 +101,18 @@ renderFragmentThread :: (group: *Thread_Group, thread: *Thread, work: *void) -> 
     jpgData.data[fragmentData.jpgDataPos + 2] = ib;
     return .CONTINUE;
 }
+/****************/
 
 /**
 * Verifies if there is a collision with an object at the given coordinates
 */
 renderFragment :: (coords : Vector2) -> Vector3
 {
+    shutterTime := 0.0;
+#if MOTION_BLUR
+{
+    shutterTime = random_get_within_range(0.0, SHUTTER_TIME);
+}
     /* Generate a ray */
     #if ANTI_ALIASING
     {
@@ -94,18 +128,22 @@ renderFragment :: (coords : Vector2) -> Vector3
             }
             ray := Ray.{
                 point,
-                fragmentLocation - point
+                fragmentLocation - point,
+                shutterTime
             };
             color += checkForCollisions(ray);
         }
         return color / (AA_SAMPLE_NUM);
     }
-    else
+    else    // NO ANTI_ALIASING
     {
         fragmentLocation := getCoordinate(coords);
+
+// this way, we avoid creating a random per fragment
         ray := Ray.{
             CAMERA_LOCATION,
-            fragmentLocation - CAMERA_LOCATION
+            fragmentLocation - CAMERA_LOCATION,
+            shutterTime
         };
         return checkForCollisions(ray);
     }
@@ -119,7 +157,7 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         if currentDepth >= MAX_RAYS
         {
             // TODO(Goose): Magic number, change this
-            return Vector3.{0, 0, 0};
+            return BLACK;
         }
         // gets the closest hit value to print on the fragment by iterating over all objects and gets the closest
         hasHit := false;
@@ -136,6 +174,18 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             }
             //shows normal color
         }
+
+        for MOVING_SPHERES
+        {
+            hit, lastHitData := checkMovingSphereCollision(ray, it);
+            if hit && lastHitData.dist < hitData.dist
+            {
+                hasHit = true;
+                hitData = lastHitData;
+                sphereHit = it.sphere;
+            }
+        }
+            //shows normal color
         if hasHit
         {
 #if OUTPUT_NORMALS
@@ -144,24 +194,14 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
 }
 else
 {
-                /* Diffuse */
+    /* Diffuse */
             if sphereHit.material ==
             {
                 case .DIFFUSE;
-                    //TODO(Goose): make this a function?
-                    bounceDirection := hitData.normal + generateRandomInUnitSphere();
-                    if nearZero(bounceDirection)
-                    {
-                        bounceDirection = hitData.normal;
-                    }
-                    bounceRay := Ray.{
-                        hitData.coordinates,
-                        hitData.normal + generateRandomInUnitSphere() // scattered direction
-                    };
+                    bounceRay := getDiffuseRay(ray.shutterTime, hitData);
                     return DIFFUSE_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
 
                 case .METAL;
-                    //TODO(Goose): make this a function?
                     reflectRay := getReflectRay(ray, hitData, sphereHit);
                     return METAL_DATA[sphereHit.materialId].attenuation * checkForCollisions(reflectRay, currentDepth + 1);
 
@@ -169,12 +209,14 @@ else
                      dielectricRay := getDielectricRay(ray, hitData, sphereHit);
                     return DIELECTRIC_DATA[sphereHit.materialId].attenuation * checkForCollisions(dielectricRay, currentDepth + 1);
                 
-                case .LIGHT;
-                    print("Implement Light material");
+                case .EMISSIVE;
+                    print("Implement Emissive material");
                 }
 }
         }
     }
+    /* Cube Collisions */
+
     /* Background colors */
     {
         rayDir := unit_vector(ray.direction);
@@ -204,82 +246,10 @@ getCoordinate :: (coords : Vector2) -> Vector3
     return fragmentLocation;
 }
 
-getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
-{
-    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
-
-    reflectRay := Ray.{
-        hitData.coordinates,
-        reflectDirection
-    };
-    if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
-    {
-        reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
-    }
-    return reflectRay;
-}
-
-getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -> Ray
-{
-    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
-
-    reflectRay := Ray.{
-        hitData.coordinates,
-        reflectDirection
-    };
-
-    #if T ==
-    {
-        case MetalData;
-            if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
-            {
-                reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
-            }
-            return reflectRay;
-
-        case DielectricData;
-            return reflectRay;
-
-        case;
-            assert(false, "ReflectRay of type: % is not implemented", materialType);
-            return Ray.{Vector3.{0,0,0}, Vector3.{0,0,0}};
-        }
-        assert(false, "Shouldn't have gotten here");
-}
-
-getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
-{
-    refractionRatio := DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
-    assert(abs(refractionRatio) > 0.000001, "Index of Refraction cannot be 0, gotten index: %", refractionRatio);
-    if hitData.frontFace 
-    {
-        refractionRatio = 1.0 /  DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
-    }
-    unitDirection := unit_vector(ray.direction);
-
-    cosTheta := min(dot_product(-unitDirection, hitData.normal), 1.0);
-    sinTheta := sqrt(1.0 - cosTheta * cosTheta);
-    perpendicular := refractionRatio * (unitDirection + cosTheta * hitData.normal);
-    parallel := -sqrt(abs(1.0 - length_squared(perpendicular))) * hitData.normal;
-
-    // Use Schlick's approximation for reflectance. It gives a chance for reflecting instead of always refracting
-     r0 := (1 - refractionRatio) / (1 + refractionRatio);
-     r0 = r0 * r0;
-     reflectance := r0 + ((1 - r0) * pow((1 - cosTheta), 5));
-
-     if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
-     {
-         return getReflectRay(ray, hitData, sphereHit, DielectricData);
-     }
-
-    return Ray.{
-        hitData.coordinates,
-        parallel + perpendicular
-    };
-}
 
 setupCamera :: () 
 {
+    assert(CAMERA_FOCUS_DIST > 0.0, "CAMERA_FOCUS_DIST needs to be > 0.0");
     // focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
     viewportHeight := 2 * tan(degreeToRadian(FOV) / 2) * CAMERA_FOCUS_DIST;
     viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};

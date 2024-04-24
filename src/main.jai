@@ -38,6 +38,9 @@ FragmentData :: struct
 /*scene data*/
 SPHERES : [..]  Sphere;
 
+// The moving spheres will only create motion blur if MOTION_BLUR == true. Otherwise they will be erndered the same as static spheres 
+MOVING_SPHERES : [..]  MovingSphere;
+
 DIFFUSE_DATA : [..] DiffuseData;
 
 METAL_DATA : [..]  MetalData;
@@ -55,7 +58,7 @@ jpgData : *JPGData;
 main :: ()
 {
     setupCamera();
-    setupMap1();
+    setupScene2();
     setupThreadGroup();
 #if MULTI_THREAD
 {
@@ -126,7 +129,7 @@ else
     shutdown(*threadGroup);
     // writes the fragment data into FILE_OUTPUT
     stbi_write_jpg(FILE_OUTPUT, IMAGE_X, IMAGE_Y, JPG_CHANNELS, *jpgData.data, 100);
-    print("Rendering complete, outputted file: %", FILE_OUTPUT);
+    print("Rendering complete, outputted file: %\n", FILE_OUTPUT);
 }
 
 setupThreadGroup :: ()
@@ -150,7 +153,7 @@ setupThreadGroup :: ()
 
 }
 
-setupMap1 :: () 
+setupScene1 :: () 
 {
     // Static location of spheres
     array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
@@ -204,4 +207,16 @@ setupMap1 :: ()
             }
         }
     }
+}
+
+// Motion blur scene
+setupScene2 :: () 
+{
+    // Static location of spheres
+    array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
+
+    color := generateRandomVec3() * generateRandomVec3();
+    array_add(*DIFFUSE_DATA, DiffuseData.{color});
+    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.0, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.5, 0.0}});
 }

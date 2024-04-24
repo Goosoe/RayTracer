@@ -2,35 +2,14 @@
 #import "Math";
 
 /**
-* Has functions and structs that allows the user to query the scene
+* 
 */
-
-/* Ray Data */
-MAX_DIST :: 300.0;
-// Using min_dist > 0 to avoid hits that are extremely close, solving shadow acne
-MIN_DIST :: 0.001;
-
-Ray :: struct
-{
-    origin : Vector3;
-    direction : Vector3;
-    // time : float;
-}
-
-Sphere :: struct
-{
-    center : Vector3;
-    radius : float;
-    material : Materials;
-    materialId : int; // id in material array
-}
-
 Materials :: enum u8
 {
     DIFFUSE :: 0;
     METAL;
     DIELECTRIC; //Materials like water and glass
-    LIGHT;
+    EMISSIVE;
 }
 
 DiffuseData :: struct
@@ -50,77 +29,187 @@ DielectricData :: struct
     indexOfRefraction : float;
 }
 
-
 HitData :: struct
 {
-    //alias for t
     dist : float = MAX_DIST;
     coordinates := Vector3.{0, 0, 0};
     normal := Vector3.{0, 0, 0};
     frontFace := true;
 }
 
-// ObjectType :: enum s8
-// {
-//     SPHERE;
-// }
+/** STATIC OBJECTS RAY CALCULATIONS **/
 
-pointAt :: (ray : Ray, point : float) -> Vector3
+getDiffuseRay :: (rayTime : float, hitData : HitData) -> Ray
 {
-    return ray.origin + (point * ray.direction);
-}
-
-/**
-* SPHERE DATA
-*/
-/**
-* Verifies if the ray hit a sphere with the given properties
-*/
-checkSphereCollision :: (ray : Ray, sphere : Sphere) -> bool, HitData
-{
-    a, b := checkSphereCollision(ray, sphere.center, sphere.radius);
-    return a, b;
-}
-
-checkSphereCollision :: (ray : Ray, center : Vector3, radius : float) -> bool, HitData
-{
-    // the sphere equation:
-    // t*t*dot( B , B ) + 2*t*dot( B,A - C ) + dot( A-C,A - C ) - R*R = 0
-    // t is the variable here that makes the this a quadratic function. 
-
-    oc := ray.origin - center;
-    a : float = dot_product(ray.direction, ray.direction);
-    // b : float = 2 * dot_product(oc, ray.direction);
-    b : float = dot_product(oc, ray.direction);
-    c : float = dot_product(oc, oc) - (radius * radius);
-    // discriminant from the quadratic formula
-    // discriminant: float = b * b - 4 * a * c;
-    discriminant: float = b * b -  a * c;
-    // ray does not hit the Sphere
-    if discriminant < 0
+    bounceDirection := hitData.normal + generateRandomInUnitSphere();
+    if nearZero(bounceDirection)
     {
-        return false, HitData.{};
+        bounceDirection = hitData.normal;
     }
-    // this is the original quadratic function: (-b - sqrt(discriminant)) / (2.0 * a);
-    // Note that the 2's and 4 were removed from the original function as they cance eachother in this case
-    SIGNAL := s8.[1, -1];
-    for SIGNAL
+    return Ray.{
+        hitData.coordinates,
+        hitData.normal + generateRandomInUnitSphere(), // scattered direction
+        rayTime
+    };
+}
+/* Gets the reflection ray of a static object with Metal material*/
+getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+{
+    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
+
+    reflectRay := Ray.{
+        hitData.coordinates,
+        reflectDirection,
+        ray.shutterTime
+    };
+    if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
     {
-        // IMPORTANT: negative calculations first
-        root := (-b - (sqrt(discriminant) * it)) / a;
-        //verifies if the hit is in front of the camera and is not too far away
-        if root <= MIN_DIST || root >= MAX_DIST
-        {
-            continue;
+        reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+    }
+    return reflectRay;
+}
+
+/* Gets the reflection ray of a static object of material Type T*/
+getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -> Ray
+{
+    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
+
+    reflectRay := Ray.{
+        hitData.coordinates,
+        reflectDirection,
+        ray.shutterTime
+    };
+
+    #if T ==
+    {
+        case MetalData;
+            if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+            {
+                reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+            }
+            return reflectRay;
+
+        case DielectricData;
+            return reflectRay;
+
+        case;
+            assert(false, "ReflectRay of type: % is not implemented", materialType);
+            return Ray.{Vector3.{0,0,0}, Vector3.{0,0,0}, 0.0};
         }
-        hitCoord := pointAt(ray, root);
-        normal := (hitCoord - center) / radius;
-        frontFace := dot_product(ray.direction, normal) < 0;
-        // guarantees that the normal is outwards facing
-        if !frontFace then normal = -normal;
-        return true, HitData.{root, hitCoord, normal, frontFace};
-    }
-    //root did not comply with defined dist values
-    return false, HitData.{};
+        assert(false, "Shouldn't have gotten here");
 }
-/***********************/
+
+/* Gets dielectric ray of a stsatic object */
+getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+{
+    refractionRatio := DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    assert(abs(refractionRatio) > 0.000001, "Index of Refraction cannot be 0, gotten index: %", refractionRatio);
+    if hitData.frontFace 
+    {
+        refractionRatio = 1.0 /  DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    }
+    unitDirection := unit_vector(ray.direction);
+
+    cosTheta := min(dot_product(-unitDirection, hitData.normal), 1.0);
+    sinTheta := sqrt(1.0 - cosTheta * cosTheta);
+    perpendicular := refractionRatio * (unitDirection + cosTheta * hitData.normal);
+    parallel := -sqrt(abs(1.0 - length_squared(perpendicular))) * hitData.normal;
+
+    // Use Schlick's approximation for reflectance. It gives a chance for reflecting instead of always refracting
+     r0 := (1 - refractionRatio) / (1 + refractionRatio);
+     r0 = r0 * r0;
+     reflectance := r0 + ((1 - r0) * pow((1 - cosTheta), 5));
+
+     if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
+     {
+         return getReflectRay(ray, hitData, sphereHit, DielectricData);
+     }
+
+    return Ray.{
+        hitData.coordinates,
+        parallel + perpendicular,
+        ray.shutterTime
+    };
+}
+
+/** MOVING OBJECTS RAY CALCULATIONS **/
+
+/* Gets the reflection ray of a static object with Metal material*/
+getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+{
+    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
+
+    reflectRay := Ray.{
+        hitData.coordinates,
+        reflectDirection,
+        ray.shutterTime
+    };
+    if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+    {
+        reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+    }
+    return reflectRay;
+}
+
+/* Gets the reflection ray of a static object of material Type T*/
+getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -> Ray
+{
+    reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
+
+    reflectRay := Ray.{
+        hitData.coordinates,
+        reflectDirection,
+        ray.shutterTime
+    };
+
+    #if T ==
+    {
+        case MetalData;
+            if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+            {
+                reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+            }
+            return reflectRay;
+
+        case DielectricData;
+            return reflectRay;
+
+        case;
+            assert(false, "ReflectRay of type: % is not implemented", materialType);
+            return Ray.{Vector3.{0,0,0}, Vector3.{0,0,0}, 0.0};
+        }
+        assert(false, "Shouldn't have gotten here");
+}
+
+/* Gets dielectric ray of a stsatic object */
+getMovingDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+{
+    refractionRatio := DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    assert(abs(refractionRatio) > 0.000001, "Index of Refraction cannot be 0, gotten index: %", refractionRatio);
+    if hitData.frontFace 
+    {
+        refractionRatio = 1.0 /  DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    }
+    unitDirection := unit_vector(ray.direction);
+
+    cosTheta := min(dot_product(-unitDirection, hitData.normal), 1.0);
+    sinTheta := sqrt(1.0 - cosTheta * cosTheta);
+    perpendicular := refractionRatio * (unitDirection + cosTheta * hitData.normal);
+    parallel := -sqrt(abs(1.0 - length_squared(perpendicular))) * hitData.normal;
+
+    // Use Schlick's approximation for reflectance. It gives a chance for reflecting instead of always refracting
+     r0 := (1 - refractionRatio) / (1 + refractionRatio);
+     r0 = r0 * r0;
+     reflectance := r0 + ((1 - r0) * pow((1 - cosTheta), 5));
+
+     if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
+     {
+         return getReflectRay(ray, hitData, sphereHit, DielectricData);
+     }
+
+    return Ray.{
+        hitData.coordinates,
+        parallel + perpendicular,
+        ray.shutterTime
+    };
+}
