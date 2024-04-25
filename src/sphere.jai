@@ -20,10 +20,13 @@ Sphere :: struct
 MovingSphere :: struct
 {
     sphere : Sphere;
-    /* second center to interpolate sphere position at a time [0, SHUTTERT_TIME]
+    /* second center to interpolate sphere position at a time [0, SHUTTER_TIME]
     * goes from the center to center1
     */
     center1 : Vector3;
+    // How long is the sphere going to take to go from center to center1. The smaller the value, the less motion blur it seems to have. 
+    // To properly function, provide a number [0, SHUTTER_TIME]
+    movingTime : float;
 }
 
 /** STATIC **/
@@ -105,7 +108,7 @@ checkMovingSphereCollision :: (ray : Ray, sphere : MovingSphere) -> bool, HitDat
     // t is the variable here that makes the this a quadratic function. 
 
     radius := sphere.sphere.radius;
-    oc := ray.origin - centerAtTime(sphere.sphere.center, sphere.center1, ray.shutterTime);
+    oc := ray.origin - centerAtTime(sphere, ray.shutterTime);
     a : float = dot_product(ray.direction, ray.direction);
     // b : float = 2 * dot_product(oc, ray.direction);
     b : float = dot_product(oc, ray.direction);
@@ -131,7 +134,7 @@ checkMovingSphereCollision :: (ray : Ray, sphere : MovingSphere) -> bool, HitDat
             continue;
         }
         hitCoord := pointAt(ray, root);
-        normal := (hitCoord - centerAtTime(sphere.sphere.center, sphere.center1, ray.shutterTime)) / radius;
+        normal := (hitCoord - centerAtTime(sphere, ray.shutterTime)) / radius;
         frontFace := dot_product(ray.direction, normal) < 0;
         // guarantees that the normal is outwards facing
         if !frontFace then normal = -normal;
@@ -142,7 +145,11 @@ checkMovingSphereCollision :: (ray : Ray, sphere : MovingSphere) -> bool, HitDat
 }
 
 /* Interpolates the center at the given time. */
-centerAtTime :: (center0 : Vector3, center1 : Vector3, time : float) -> Vector3{
-    centerDiff := center1 - center0;
-    return center0 + (centerDiff * time);
+centerAtTime :: (sphere : MovingSphere, time : float) -> Vector3{
+    if time >=  sphere.movingTime
+    {
+        return sphere.center1;
+    }
+    centerDiff := sphere.center1 - sphere.sphere.center;
+    return sphere.sphere.center + (centerDiff * (time / SHUTTER_TIME));
 }

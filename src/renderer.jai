@@ -19,8 +19,8 @@ BLACK :: Vector3.{0, 0, 0};
 
 /* Motion blur */
 //For how long the shutter will stay "open". It will go from [0.0, SHUTTER_TIME]
-MOTION_BLUR :: false;
-SHUTTER_TIME :: 0.8;
+MOTION_BLUR :: true;
+SHUTTER_TIME :: 2;
 /* Render Data */
 MAX_RAYS :: 100;
 
@@ -88,7 +88,7 @@ renderFragmentThread :: (group: *Thread_Group, thread: *Thread, work: *void) -> 
 {
     fragmentData := cast(*FragmentData) work;
     color := renderFragment(fragmentData.coords);
-    
+
     color = linearToGamma(color);
 
     ir : u8 = cast(u8)(255.99 * color.x);
@@ -108,11 +108,6 @@ renderFragmentThread :: (group: *Thread_Group, thread: *Thread, work: *void) -> 
 */
 renderFragment :: (coords : Vector2) -> Vector3
 {
-    shutterTime := 0.0;
-#if MOTION_BLUR
-{
-    shutterTime = random_get_within_range(0.0, SHUTTER_TIME);
-}
     /* Generate a ray */
     #if ANTI_ALIASING
     {
@@ -120,6 +115,14 @@ renderFragment :: (coords : Vector2) -> Vector3
         // Randomizes a value around the original uv
         for 0 .. AA_SAMPLE_NUM - 1
         {
+            #if MOTION_BLUR
+            {
+                shutterTime := random_get_within_range(0.0, SHUTTER_TIME);
+            }
+            else
+            {
+                shutterTime := 0.0;
+            }
             fragmentLocation := getRandomAdjacentCoordinate(coords);
             point := CAMERA_LOCATION;
             if CAMERA_DEFOCUS_ANGLE > 0
@@ -137,9 +140,17 @@ renderFragment :: (coords : Vector2) -> Vector3
     }
     else    // NO ANTI_ALIASING
     {
+        #if MOTION_BLUR
+        {
+            shutterTime := random_get_within_range(0.0, SHUTTER_TIME);
+        }
+        else
+        {
+            shutterTime := 0.0;
+        }
         fragmentLocation := getCoordinate(coords);
 
-// this way, we avoid creating a random per fragment
+        // this way, we avoid creating a random per fragment
         ray := Ray.{
             CAMERA_LOCATION,
             fragmentLocation - CAMERA_LOCATION,
@@ -185,97 +196,97 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
                 sphereHit = it.sphere;
             }
         }
-            //shows normal color
+        //shows normal color
         if hasHit
         {
-#if OUTPUT_NORMALS
-{
-            return 0.5 * make_vector3(hitData.normal.x + 1, hitData.normal.y + 1, hitData.normal.z + 1);
-}
-else
-{
-    /* Diffuse */
-            if sphereHit.material ==
+            #if OUTPUT_NORMALS
             {
-                case .DIFFUSE;
-                    bounceRay := getDiffuseRay(ray.shutterTime, hitData);
-                    return DIFFUSE_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
+                return 0.5 * make_vector3(hitData.normal.x + 1, hitData.normal.y + 1, hitData.normal.z + 1);
+            }
+            else
+            {
+                /* Diffuse */
+                if sphereHit.material ==
+                {
+                    case .DIFFUSE;
+                        bounceRay := getDiffuseRay(ray.shutterTime, hitData);
+                        return DIFFUSE_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
 
-                case .METAL;
-                    reflectRay := getReflectRay(ray, hitData, sphereHit);
-                    return METAL_DATA[sphereHit.materialId].attenuation * checkForCollisions(reflectRay, currentDepth + 1);
+                    case .METAL;
+                        reflectRay := getReflectRay(ray, hitData, sphereHit);
+                        return METAL_DATA[sphereHit.materialId].attenuation * checkForCollisions(reflectRay, currentDepth + 1);
 
-                case .DIELECTRIC;
-                     dielectricRay := getDielectricRay(ray, hitData, sphereHit);
-                    return DIELECTRIC_DATA[sphereHit.materialId].attenuation * checkForCollisions(dielectricRay, currentDepth + 1);
-                
-                case .EMISSIVE;
-                    print("Implement Emissive material");
+                    case .DIELECTRIC;
+                        dielectricRay := getDielectricRay(ray, hitData, sphereHit);
+                        return DIELECTRIC_DATA[sphereHit.materialId].attenuation * checkForCollisions(dielectricRay, currentDepth + 1);
+
+                    case .EMISSIVE;
+                        print("Implement Emissive material");
+                    }
                 }
-}
+            }
+        }
+        /* Cube Collisions */
+
+        /* Background colors */
+        {
+            rayDir := unit_vector(ray.direction);
+            // transforms the direction to a positive value between [0,1]
+            coord := 0.5 * (rayDir.y + 1.0);
+            // applies the lerp
+            //((1.0 - coord) * BACKGROUND_COLOR1) + (coord * BACKGROUND_COLOR2);
+            // print("Bacground hit at depth: %\n", currentDepth);
+            return lerp(BACKGROUND_COLOR1, BACKGROUND_COLOR2, coord);
         }
     }
-    /* Cube Collisions */
 
-    /* Background colors */
+    /* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
+    getRandomAdjacentCoordinate :: (coords : Vector2) -> Vector3
     {
-        rayDir := unit_vector(ray.direction);
-        // transforms the direction to a positive value between [0,1]
-        coord := 0.5 * (rayDir.y + 1.0);
-        // applies the lerp
-        //((1.0 - coord) * BACKGROUND_COLOR1) + (coord * BACKGROUND_COLOR2);
-        // print("Bacground hit at depth: %\n", currentDepth);
-        return lerp(BACKGROUND_COLOR1, BACKGROUND_COLOR2, coord);
+        uvOffset := Vector2.{(-0.5 + random_get_zero_to_one()) / IMAGE_X, (-0.5 + random_get_zero_to_one())  / IMAGE_Y};
+        uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
+        fragmentLocation := camera.viewportLowerLeft + ((uv.x  + uvOffset.x) * camera.viewportWidth) + ((uv.y + uvOffset.y) * camera.viewportHeight);
+        return fragmentLocation;
     }
-}
 
-/* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
-getRandomAdjacentCoordinate :: (coords : Vector2) -> Vector3
-{
-    uvOffset := Vector2.{(-0.5 + random_get_zero_to_one()) / IMAGE_X, (-0.5 + random_get_zero_to_one())  / IMAGE_Y};
-    uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
-    fragmentLocation := camera.viewportLowerLeft + ((uv.x  + uvOffset.x) * camera.viewportWidth) + ((uv.y + uvOffset.y) * camera.viewportHeight);
-    return fragmentLocation;
-}
-
-/* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
-getCoordinate :: (coords : Vector2) -> Vector3
-{
-    uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
-    fragmentLocation := camera.viewportLowerLeft + (uv.x * camera.viewportWidth) + (uv.y * camera.viewportHeight);
-    return fragmentLocation;
-}
+    /* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
+    getCoordinate :: (coords : Vector2) -> Vector3
+    {
+        uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
+        fragmentLocation := camera.viewportLowerLeft + (uv.x * camera.viewportWidth) + (uv.y * camera.viewportHeight);
+        return fragmentLocation;
+    }
 
 
-setupCamera :: () 
-{
-    assert(CAMERA_FOCUS_DIST > 0.0, "CAMERA_FOCUS_DIST needs to be > 0.0");
-    // focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
-    viewportHeight := 2 * tan(degreeToRadian(FOV) / 2) * CAMERA_FOCUS_DIST;
-    viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};
-    w := unit_vector(CAMERA_LOCATION - CAMERA_LOOK_AT);
-    u := unit_vector(cross_product(CAMERA_UP, w));
-    v := cross_product(w, u);
-    viewportU := viewportSize.x * u;
-    viewportV := viewportSize.y * v;
-    lowerLeft := CAMERA_LOCATION - (CAMERA_FOCUS_DIST * w) - (viewportU / 2) - (viewportV / 2);
-    
-    defocusRadius := CAMERA_FOCUS_DIST * tan(degreeToRadian(CAMERA_DEFOCUS_ANGLE / 2));
-    defocusDiskU := u * defocusRadius;
-    defocusDiskV := v * defocusRadius;
+    setupCamera :: () 
+    {
+        assert(CAMERA_FOCUS_DIST > 0.0, "CAMERA_FOCUS_DIST needs to be > 0.0");
+        // focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
+        viewportHeight := 2 * tan(degreeToRadian(FOV) / 2) * CAMERA_FOCUS_DIST;
+        viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};
+        w := unit_vector(CAMERA_LOCATION - CAMERA_LOOK_AT);
+        u := unit_vector(cross_product(CAMERA_UP, w));
+        v := cross_product(w, u);
+        viewportU := viewportSize.x * u;
+        viewportV := viewportSize.y * v;
+        lowerLeft := CAMERA_LOCATION - (CAMERA_FOCUS_DIST * w) - (viewportU / 2) - (viewportV / 2);
 
-    camera = Camera.{
-        viewportV,
-        viewportU,
-        lowerLeft,
-        defocusDiskU,
-        defocusDiskV
-    };
-    print("Camera set up! Current aspect ratio: %\n", ASPECT_RATIO);
-}
+        defocusRadius := CAMERA_FOCUS_DIST * tan(degreeToRadian(CAMERA_DEFOCUS_ANGLE / 2));
+        defocusDiskU := u * defocusRadius;
+        defocusDiskV := v * defocusRadius;
 
-sampleDefocusDisk :: () -> Vector3
-{
-    point := generateRandomInUnitCircle();
-    return CAMERA_LOCATION + (point.x * camera.defocusDiskU) + (point.y * camera.defocusDiskV);
-}
+        camera = Camera.{
+            viewportV,
+            viewportU,
+            lowerLeft,
+            defocusDiskU,
+            defocusDiskV
+        };
+        print("Camera set up! Current aspect ratio: %\n", ASPECT_RATIO);
+    }
+
+    sampleDefocusDisk :: () -> Vector3
+    {
+        point := generateRandomInUnitCircle();
+        return CAMERA_LOCATION + (point.x * camera.defocusDiskU) + (point.y * camera.defocusDiskV);
+    }

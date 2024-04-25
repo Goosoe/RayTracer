@@ -218,5 +218,5 @@ setupScene2 :: ()
 
     color := generateRandomVec3() * generateRandomVec3();
     array_add(*DIFFUSE_DATA, DiffuseData.{color});
-    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.0, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.5, 0.0}});
+    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
 }
