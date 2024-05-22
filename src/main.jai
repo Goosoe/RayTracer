@@ -10,12 +10,17 @@
 
 #load "objects.jai";
 #load "renderer.jai";
+#load "structures/BVH.jai";
 
-IMAGE_X :: 400;
-IMAGE_Y :: 200;
+IMAGE_X :: 1920;
+IMAGE_Y :: 1080;
 IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
 MULTI_THREAD :: true;
 NUM_THREADS :: 10;
+// BVH_TREE_DEPTH :: 8;
+
+//TODO(Goose): Make a const for each scene and make it use the correct one
+// OBJECTS_IN_SCENE :: 4;
 NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
 FILE_OUTPUT :: "out.jpg";
 
@@ -37,6 +42,16 @@ FragmentData :: struct
 
 /*scene data*/
 SPHERES : [..]  Sphere;
+SPHERES_IDX : [..] int;
+
+/* Max size that the tree can have. Of Type Sphere*/
+// SPHERE_TREE : [2 ^ BVH_TREE_DEPTH - 1] BVHNode(Sphere);
+// 2^BVH_TREE_DEPTH + 1 = 17 
+// SPHERE_TREE : [17] BVHNode(Sphere);
+// TODO(Goose): WHEN SPHERES IS A FIXED SIZE, USE THAT SIZE HERE. (2 * SPHERES.count) + 1. Imagine that we have 1 object per depth, that will be 2 nodes per object. Thus 2 * objects. +1 because of root node. Also, add a depth limiter, if too many objects.
+SPHERE_TREE : [..] BVHNode;
+
+// SPHERE_TREE : [..] BVHNode(Sphere);
 
 // The moving spheres will only create motion blur if MOTION_BLUR == true. Otherwise they will be erndered the same as static spheres 
 MOVING_SPHERES : [..]  MovingSphere;
@@ -52,13 +67,46 @@ threadGroup: Thread_Group;
 pool: Pool;
 
 jpgData : *JPGData;
+
+/* testing the bvh tree creation */
+main2 :: ()
+{
+    SPHERES.allocator = temp;
+    // SPHERE_TREE.allocator = temp;
+
+    MOVING_SPHERES.allocator = temp;
+
+    DIFFUSE_DATA.allocator = temp;
+    METAL_DATA.allocator = temp;
+    DIELECTRIC_DATA.allocator = temp;
+
+
+    setupScene3();
+    // createTree(*SPHERES, 1);
+    createTree(Sphere);
+}
 /*
 * Initializes data and requests data per pixel of the image. Outputs an image a .jpg in the end
 */
 main :: ()
+// main :: ()
 {
+   // SPHERES.allocator = temp;
+   // // SPHERE_TREE.allocator = temp;
+
+   // MOVING_SPHERES.allocator = temp;
+
+   // DIFFUSE_DATA.allocator = temp;
+   // METAL_DATA.allocator = temp;
+   // DIELECTRIC_DATA.allocator = temp;
+
     setupCamera();
-    setupScene2();
+    setupScene1();
+    //setupScene2();
+    // setupScene3();
+    createTree(Sphere);
+
+
     setupThreadGroup();
 #if MULTI_THREAD
 {
@@ -155,6 +203,7 @@ setupThreadGroup :: ()
 
 setupScene1 :: () 
 {
+    //TODO(Goose): we know how many spheres are in the scene. The arrays can be statically allocated for this scene
     // Static location of spheres
     array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
     array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, Materials.DIFFUSE, 1});
@@ -212,6 +261,7 @@ setupScene1 :: ()
 // Motion blur scene
 setupScene2 :: () 
 {
+    //TODO(Goose): we know how many spheres are in the scene. The arrays can be statically allocated for this scene
     // Static location of spheres
     array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});
     array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
@@ -219,4 +269,20 @@ setupScene2 :: ()
     color := generateRandomVec3() * generateRandomVec3();
     array_add(*DIFFUSE_DATA, DiffuseData.{color});
     array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
+}
+
+// 2 static sphere scene for testing
+setupScene3 :: () 
+{
+    // Static location of spheres
+    array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
+
+    color := generateRandomVec3() * generateRandomVec3();
+    array_add(*DIFFUSE_DATA, DiffuseData.{color});
+    array_add(*SPHERES, Sphere.{Vector3.{0.0, 3.5, 0.0}, 1, Materials.DIFFUSE, 1});
+
+    array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, Materials.DIFFUSE, 1});
+    array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, Materials.DIFFUSE, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, Materials.DIFFUSE, 1});
 }

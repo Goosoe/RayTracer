@@ -19,7 +19,7 @@ Sphere :: struct
 
 MovingSphere :: struct
 {
-    sphere : Sphere;
+    using sphere : Sphere;
     /* second center to interpolate sphere position at a time [0, SHUTTER_TIME]
     * goes from the center to center1
     */
@@ -107,7 +107,7 @@ checkMovingSphereCollision :: (ray : Ray, sphere : MovingSphere) -> bool, HitDat
     // t*t*dot( B , B ) + 2*t*dot( B,A - C ) + dot( A-C,A - C ) - R*R = 0
     // t is the variable here that makes the this a quadratic function. 
 
-    radius := sphere.sphere.radius;
+    radius := sphere.radius;
     oc := ray.origin - centerAtTime(sphere, ray.shutterTime);
     a : float = dot_product(ray.direction, ray.direction);
     // b : float = 2 * dot_product(oc, ray.direction);
@@ -150,6 +150,6 @@ centerAtTime :: (sphere : MovingSphere, time : float) -> Vector3{
     {
         return sphere.center1;
     }
-    centerDiff := sphere.center1 - sphere.sphere.center;
-    return sphere.sphere.center + (centerDiff * (time / SHUTTER_TIME));
+    centerDiff := sphere.center1 - sphere.center;
+    return sphere.center + (centerDiff * (time / SHUTTER_TIME));
 }

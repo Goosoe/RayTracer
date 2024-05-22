@@ -81,3 +81,22 @@ degreeToRadian :: (degrees : float) -> float
 {
     return degrees * PI / 180; 
 }
+
+getAxis :: (axis : int, vector : Vector3) -> float
+{
+    if axis == 0 return vector.x;
+    if axis == 1 return vector.y;
+    if axis == 2 return vector.z;
+    assert(false, "Axis value must be between [0,2]");
+    return -1;
+}
+
+/* Creates an empty bounding box with min and max with arbitrarily large values*/
+createBoundingBox :: () -> BoundingBox
+{
+    return BoundingBox.{
+        make_vector3(FLOAT32_MAX),
+        make_vector3(FLOAT32_MIN),
+        STATIC_OBJECT
+    };
+}

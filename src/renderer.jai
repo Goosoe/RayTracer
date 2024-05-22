@@ -4,6 +4,7 @@
 
 #load "utils.jai";
 #load "sphere.jai";
+#load "bounding_box.jai";
 
 /* Output Data */
 JPG_CHANNELS :: 3;
@@ -174,8 +175,9 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         hasHit := false;
         hitData: HitData;
         sphereHit : Sphere;
+        // 85
         for SPHERES
-        {
+        { 
             hit, lastHitData := checkSphereCollision(ray, it);
             if hit && lastHitData.dist < hitData.dist
             {
@@ -185,6 +187,9 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             }
             //shows normal color
         }
+        // 77
+        //
+        // hasHit, hitData, sphereHit = checkBVHCollision(Sphere, ray);
 
         for MOVING_SPHERES
         {
