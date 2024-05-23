@@ -75,18 +75,9 @@ jpgData : *JPGData;
 */
 main :: ()
 {
-   // SPHERES.allocator = temp;
-   // // SPHERES_TREE.allocator = temp;
-
-   // MOVING_SPHERES.allocator = temp;
-
-   // DIFFUSE_DATA.allocator = temp;
-   // METAL_DATA.allocator = temp;
-   // DIELECTRIC_DATA.allocator = temp;
-
     setupCamera();
-    // setupScene1();
-    setupScene2();
+    setupScene1();
+    // setupScene2();
     // setupScene3();
     createTree(Sphere);
 
