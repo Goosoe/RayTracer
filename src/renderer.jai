@@ -29,16 +29,14 @@ MAX_RAYS :: 100;
 // ORIGIN :: Vector3.{0.0, 0.0, 0.0};
 
 /* Camera Data */
-CAMERA_LOCATION :: Vector3.{3, 2, 3};
+CAMERA_LOCATION :: Vector3.{4, 1.5, 1.5};
 CAMERA_LOOK_AT :: Vector3.{0, 0, 0};
 CAMERA_UP :: Vector3.{0, 1, 0};
 // Set this to 0 to not have defocus
 CAMERA_DEFOCUS_ANGLE :: 0.0;
 CAMERA_FOCUS_DIST :: 1;
-// or defocus blur
-//DEPTH_OF_FIELD :: Vector3.{0, 1, 0};
 // Vertical Degrees
-FOV :: 90;
+FOV :: 80;
 
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
@@ -175,21 +173,7 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         hasHit := false;
         hitData: HitData;
         sphereHit : Sphere;
-        // 85
-        for SPHERES
-        { 
-            hit, lastHitData := checkSphereCollision(ray, it);
-            if hit && lastHitData.dist < hitData.dist
-            {
-                hasHit = true;
-                hitData = lastHitData;
-                sphereHit = it;
-            }
-            //shows normal color
-        }
-        // 77
-        //
-        // hasHit, hitData, sphereHit = checkBVHCollision(Sphere, ray);
+        hasHit, hitData, sphereHit = checkBVHCollision(Sphere, ray);
 
         for MOVING_SPHERES
         {
