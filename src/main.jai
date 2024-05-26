@@ -10,17 +10,17 @@
 
 #load "ray.jai";
 #load "renderer.jai";
-#load "structures/BVH.jai";
+#load "BVH.jai";
 
-IMAGE_X :: 400;
-IMAGE_Y :: 200;
+IMAGE_X :: 1920;
+IMAGE_Y :: 1080;
 IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
 MULTI_THREAD :: true;
 NUM_THREADS :: 10;
 
 NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
 
-SCENE_TO_RENDER :: 2;
+SCENE_TO_RENDER :: 0;
 FILE_OUTPUT :: "out.jpg";
 
 

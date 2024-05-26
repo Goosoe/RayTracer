@@ -5,7 +5,7 @@
 #load "utils.jai";
 #load "sphere.jai";
 #load "material.jai";
-#load "structures/bounding_box.jai";
+#load "bounding_box.jai";
 
 /* Output Data */
 JPG_CHANNELS :: 3;
