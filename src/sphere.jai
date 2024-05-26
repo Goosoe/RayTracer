@@ -13,7 +13,7 @@ Sphere :: struct
 {
     center : Vector3;
     radius : float;
-    material : Materials;
+    material : MaterialType;
     materialId : int; // id in material array
 }
 
@@ -75,11 +75,11 @@ checkSphereCollision :: (ray : Ray, center : Vector3, radius : float) -> bool, H
             continue;
         }
         hitCoord := pointAt(ray, root);
-        normal := (hitCoord - center) / radius;
+        normal := normalize((hitCoord - center) / radius);
         frontFace := dot_product(ray.direction, normal) < 0;
         // guarantees that the normal is outwards facing
         if !frontFace then normal = -normal;
-        return true, HitData.{root, hitCoord, normal, frontFace};
+        return true, HitData.{root, hitCoord, normal, getSphereUV(normal), frontFace};
     }
     //root did not comply with defined dist values
     return false, HitData.{};
@@ -88,15 +88,6 @@ checkSphereCollision :: (ray : Ray, center : Vector3, radius : float) -> bool, H
 
 
 /** MOVING **/
-
-/**
-* Verifies if the ray hit a moving sphere with the given properties
-*/
-// checkMovingSphereCollision :: (ray : Ray, sphere : MovingSphere) -> bool, HitData
-// {
-//     a, b := checkMovingSphereCollision(ray, sphere.sphere.center, sphere.sphere.radius);
-//     return a, b;
-// }
 
 /**
 * Verifies if the ray hit moving a sphere with the given properties
@@ -134,11 +125,11 @@ checkMovingSphereCollision :: (ray : Ray, sphere : MovingSphere) -> bool, HitDat
             continue;
         }
         hitCoord := pointAt(ray, root);
-        normal := (hitCoord - centerAtTime(sphere, ray.shutterTime)) / radius;
+        normal := normalize((hitCoord - centerAtTime(sphere, ray.shutterTime)) / radius);
         frontFace := dot_product(ray.direction, normal) < 0;
         // guarantees that the normal is outwards facing
         if !frontFace then normal = -normal;
-        return true, HitData.{root, hitCoord, normal, frontFace};
+        return true, HitData.{root, hitCoord, normal, getSphereUV(normal), frontFace};
     }
     //root did not comply with defined dist values
     return false, HitData.{};
@@ -152,4 +143,23 @@ centerAtTime :: (sphere : MovingSphere, time : float) -> Vector3{
     }
     centerDiff := sphere.center1 - sphere.center;
     return sphere.center + (centerDiff * (time / SHUTTER_TIME));
+}
+
+getSphereUV :: (point : Vector3) -> Vector2 //uv
+{
+    // p: a given point on the sphere of radius one, centered at the origin. (Must be previously normalized).
+    // u: returned value [0,1] of angle around the Y axis from X=-1.
+    // v: returned value [0,1] of angle from Y=-1 to Y=+1.
+    //     <1 0 0> yields <0.50 0.50>       <-1  0  0> yields <0.00 0.50>
+    //     <0 1 0> yields <0.50 1.00>       < 0 -1  0> yields <0.50 0.00>
+    //     <0 0 1> yields <0.25 0.50>       < 0  0 -1> yields <0.75 0.50>
+
+    // auto theta = acos(-p.y());
+    // auto phi = atan2(-p.z(), p.x()) + PI;
+    theta := acos(-point.y);
+    phi := atan2(-point.z, point.x) + PI;
+
+    // u = phi / (2*pi);
+    // v = theta / pi;
+    return Vector2.{phi / (2 * PI), theta / PI};
 }

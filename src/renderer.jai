@@ -4,6 +4,7 @@
 
 #load "utils.jai";
 #load "sphere.jai";
+#load "material.jai";
 #load "structures/bounding_box.jai";
 
 /* Output Data */
@@ -68,18 +69,6 @@ MAX_DIST :: 300.0;
 // Using min_dist > 0 to avoid hits that are extremely close, solving shadow acne
 MIN_DIST :: 0.001;
 
-Ray :: struct
-{
-    origin : Vector3;
-    direction : Vector3;
-    // time of the shutter when ray is created. Used to simulate movement and thus, motion blur 
-    shutterTime : float = 0;
-}
-
-pointAt :: (ray : Ray, point : float) -> Vector3
-{
-    return ray.origin + (point * ray.direction);
-}
 
 
 /** MULTI-THREADED VARIANT **/
@@ -133,6 +122,7 @@ renderFragment :: (coords : Vector2) -> Vector3
                 fragmentLocation - point,
                 shutterTime
             };
+            /* TODO(Goose): Add texture color calculation herer*/
             color += checkForCollisions(ray);
         }
         return color / (AA_SAMPLE_NUM);
@@ -195,87 +185,91 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             else
             {
                 /* Diffuse */
+                //TODO(Goose): This can be replaced by compile time Type verification. This is a solution "A la C"
                 if sphereHit.material ==
                 {
                     case .DIFFUSE;
                         bounceRay := getDiffuseRay(ray.shutterTime, hitData);
-                        return DIFFUSE_DATA[sphereHit.materialId].attenuation * checkForCollisions(bounceRay, currentDepth + 1);
+                //TODO(Goose): Replace this with a function on object.jai. It should calculate the material + texture color 
+                        materialData := DIFFUSE_DATA[sphereHit.materialId];
+                        return materialData.attenuation * checkForCollisions(bounceRay, currentDepth + 1) * getTextureAtUV(materialData.textureType, hitData.uv, hitData.coordinates, materialData.textureIdx);
 
                     case .METAL;
                         reflectRay := getReflectRay(ray, hitData, sphereHit);
-                        return METAL_DATA[sphereHit.materialId].attenuation * checkForCollisions(reflectRay, currentDepth + 1);
+                        materialData := METAL_DATA[sphereHit.materialId];
+                        return materialData.attenuation * checkForCollisions(reflectRay, currentDepth + 1) * getTextureAtUV(materialData.textureType, hitData.uv, hitData.coordinates, materialData.textureIdx);
 
                     case .DIELECTRIC;
                         dielectricRay := getDielectricRay(ray, hitData, sphereHit);
-                        return DIELECTRIC_DATA[sphereHit.materialId].attenuation * checkForCollisions(dielectricRay, currentDepth + 1);
+                        materialData := DIELECTRIC_DATA[sphereHit.materialId];
+                        return materialData.attenuation * checkForCollisions(dielectricRay, currentDepth + 1) * getTextureAtUV(materialData.textureType, hitData.uv, hitData.coordinates, materialData.textureIdx);
 
                     case .EMISSIVE;
                         print("Implement Emissive material");
-                    }
                 }
             }
         }
+    }
         /* Cube Collisions */
 
-        /* Background colors */
-        {
-            rayDir := unit_vector(ray.direction);
-            // transforms the direction to a positive value between [0,1]
-            coord := 0.5 * (rayDir.y + 1.0);
-            // applies the lerp
-            //((1.0 - coord) * BACKGROUND_COLOR1) + (coord * BACKGROUND_COLOR2);
-            // print("Bacground hit at depth: %\n", currentDepth);
-            return lerp(BACKGROUND_COLOR1, BACKGROUND_COLOR2, coord);
-        }
+    /* Background colors */
+    {
+        rayDir := unit_vector(ray.direction);
+        // transforms the direction to a positive value between [0,1]
+        coord := 0.5 * (rayDir.y + 1.0);
+        // applies the lerp
+        //((1.0 - coord) * BACKGROUND_COLOR1) + (coord * BACKGROUND_COLOR2);
+        // print("Bacground hit at depth: %\n", currentDepth);
+        return lerp(BACKGROUND_COLOR1, BACKGROUND_COLOR2, coord);
     }
+}
 
     /* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
-    getRandomAdjacentCoordinate :: (coords : Vector2) -> Vector3
-    {
+getRandomAdjacentCoordinate :: (coords : Vector2) -> Vector3
+{
         uvOffset := Vector2.{(-0.5 + random_get_zero_to_one()) / IMAGE_X, (-0.5 + random_get_zero_to_one())  / IMAGE_Y};
         uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
         fragmentLocation := camera.viewportLowerLeft + ((uv.x  + uvOffset.x) * camera.viewportWidth) + ((uv.y + uvOffset.y) * camera.viewportHeight);
         return fragmentLocation;
-    }
+}
 
-    /* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
-    getCoordinate :: (coords : Vector2) -> Vector3
-    {
-        uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
-        fragmentLocation := camera.viewportLowerLeft + (uv.x * camera.viewportWidth) + (uv.y * camera.viewportHeight);
-        return fragmentLocation;
-    }
+/* Returns the data associated with the given coordinate. uv and fragmentLocation in the viewport */
+getCoordinate :: (coords : Vector2) -> Vector3
+{
+    uv := Vector2.{coords.x / IMAGE_X, coords.y / IMAGE_Y};
+    fragmentLocation := camera.viewportLowerLeft + (uv.x * camera.viewportWidth) + (uv.y * camera.viewportHeight);
+    return fragmentLocation;
+}
 
+setupCamera :: () 
+{
+    assert(CAMERA_FOCUS_DIST > 0.0, "CAMERA_FOCUS_DIST needs to be > 0.0");
+    // focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
+    viewportHeight := 2 * tan(degreeToRadian(FOV) / 2) * CAMERA_FOCUS_DIST;
+    viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};
+    w := unit_vector(CAMERA_LOCATION - CAMERA_LOOK_AT);
+    u := unit_vector(cross_product(CAMERA_UP, w));
+    v := cross_product(w, u);
+    viewportU := viewportSize.x * u;
+    viewportV := viewportSize.y * v;
+    lowerLeft := CAMERA_LOCATION - (CAMERA_FOCUS_DIST * w) - (viewportU / 2) - (viewportV / 2);
 
-    setupCamera :: () 
-    {
-        assert(CAMERA_FOCUS_DIST > 0.0, "CAMERA_FOCUS_DIST needs to be > 0.0");
-        // focalLength := length(CAMERA_LOCATION - CAMERA_LOOK_AT);
-        viewportHeight := 2 * tan(degreeToRadian(FOV) / 2) * CAMERA_FOCUS_DIST;
-        viewportSize := Vector2.{viewportHeight * ASPECT_RATIO, viewportHeight};
-        w := unit_vector(CAMERA_LOCATION - CAMERA_LOOK_AT);
-        u := unit_vector(cross_product(CAMERA_UP, w));
-        v := cross_product(w, u);
-        viewportU := viewportSize.x * u;
-        viewportV := viewportSize.y * v;
-        lowerLeft := CAMERA_LOCATION - (CAMERA_FOCUS_DIST * w) - (viewportU / 2) - (viewportV / 2);
+    defocusRadius := CAMERA_FOCUS_DIST * tan(degreeToRadian(CAMERA_DEFOCUS_ANGLE / 2));
+    defocusDiskU := u * defocusRadius;
+    defocusDiskV := v * defocusRadius;
 
-        defocusRadius := CAMERA_FOCUS_DIST * tan(degreeToRadian(CAMERA_DEFOCUS_ANGLE / 2));
-        defocusDiskU := u * defocusRadius;
-        defocusDiskV := v * defocusRadius;
+    camera = Camera.{
+        viewportV,
+        viewportU,
+        lowerLeft,
+        defocusDiskU,
+        defocusDiskV
+    };
+    print("Camera set up! Current aspect ratio: %\n", ASPECT_RATIO);
+}
 
-        camera = Camera.{
-            viewportV,
-            viewportU,
-            lowerLeft,
-            defocusDiskU,
-            defocusDiskV
-        };
-        print("Camera set up! Current aspect ratio: %\n", ASPECT_RATIO);
-    }
-
-    sampleDefocusDisk :: () -> Vector3
-    {
-        point := generateRandomInUnitCircle();
-        return CAMERA_LOCATION + (point.x * camera.defocusDiskU) + (point.y * camera.defocusDiskV);
-    }
+sampleDefocusDisk :: () -> Vector3
+{
+    point := generateRandomInUnitCircle();
+    return CAMERA_LOCATION + (point.x * camera.defocusDiskU) + (point.y * camera.defocusDiskV);
+}

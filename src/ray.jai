@@ -2,31 +2,15 @@
 #import "Math";
 
 /**
-* 
+* Has functions dedicated to get ray information and the objects that it might intersect in a scene 
 */
-Materials :: enum u8
-{
-    DIFFUSE :: 0;
-    METAL;
-    DIELECTRIC; //Materials like water and glass
-    EMISSIVE;
-}
 
-DiffuseData :: struct
+Ray :: struct
 {
-    attenuation : Vector3;
-}
-
-MetalData :: struct
-{
-    attenuation : Vector3;
-    fuzz : float;
-}
-
-DielectricData :: struct
-{
-    attenuation : Vector3;
-    indexOfRefraction : float;
+    origin : Vector3;
+    direction : Vector3;
+    // time of the shutter when ray is created. Used to simulate movement and thus, motion blur 
+    shutterTime : float = 0;
 }
 
 HitData :: struct
@@ -34,7 +18,13 @@ HitData :: struct
     dist : float = MAX_DIST;
     coordinates := Vector3.{0, 0, 0};
     normal := Vector3.{0, 0, 0};
+    uv := Vector2.{0, 0};
     frontFace := true;
+}
+
+pointAt :: (ray : Ray, point : float) -> Vector3
+{
+    return ray.origin + (point * ray.direction);
 }
 
 /** STATIC OBJECTS RAY CALCULATIONS **/
@@ -82,18 +72,18 @@ getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -
 
     #if T ==
     {
-        case MetalData;
+        case MaterialMetal;
             if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
             {
                 reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
             }
             return reflectRay;
 
-        case DielectricData;
+        case MaterialDielectric;
             return reflectRay;
 
         case;
-            assert(false, "ReflectRay of type: % is not implemented", materialType);
+            assert(false, "ReflectRay of type: % is not implemented", T);
             return Ray.{Vector3.{0,0,0}, Vector3.{0,0,0}, 0.0};
         }
         assert(false, "Shouldn't have gotten here");
@@ -122,7 +112,7 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
 
      if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
      {
-         return getReflectRay(ray, hitData, sphereHit, DielectricData);
+         return getReflectRay(ray, hitData, sphereHit, MaterialDielectric);
      }
 
     return Ray.{
@@ -164,18 +154,18 @@ getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : T
 
     #if T ==
     {
-        case MetalData;
+        case MaterialMetal;
             if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
             {
                 reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
             }
             return reflectRay;
 
-        case DielectricData;
+        case MaterialDielectric;
             return reflectRay;
 
         case;
-            assert(false, "ReflectRay of type: % is not implemented", materialType);
+            assert(false, "ReflectRay of type: % is not implemented", T);
             return Ray.{Vector3.{0,0,0}, Vector3.{0,0,0}, 0.0};
         }
         assert(false, "Shouldn't have gotten here");
@@ -204,7 +194,7 @@ getMovingDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> 
 
      if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
      {
-         return getReflectRay(ray, hitData, sphereHit, DielectricData);
+         return getReflectRay(ray, hitData, sphereHit, MaterialDielectric);
      }
 
     return Ray.{

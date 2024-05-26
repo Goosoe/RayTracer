@@ -8,7 +8,7 @@
 #import "Thread";
 #import "stb_image_write";
 
-#load "objects.jai";
+#load "ray.jai";
 #load "renderer.jai";
 #load "structures/BVH.jai";
 
@@ -17,12 +17,12 @@ IMAGE_Y :: 200;
 IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
 MULTI_THREAD :: true;
 NUM_THREADS :: 10;
-// BVH_TREE_DEPTH :: 8;
 
-//TODO(Goose): Make a const for each scene and make it use the correct one
-// OBJECTS_IN_SCENE :: 4;
 NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
+
+SCENE_TO_RENDER :: 2;
 FILE_OUTPUT :: "out.jpg";
+
 
 // Helper for building the jpg
 JPGData :: struct
@@ -40,10 +40,12 @@ FragmentData :: struct
     jpgDataPos : int;
 }
 
-// TODO(Goose): check for need to allocate memory for thees data arrays
+// TODO(Goose): check for need to allocate memory for these data arrays
+
 /*scene data*/
 SPHERES : [..]  Sphere;
 SPHERES_IDX : [..] int;
+
 /* Max size that the tree can have. Of Type Sphere*/
 // SPHERES_TREE : [2 ^ BVH_TREE_DEPTH - 1] BVHNode(Sphere);
 // 2^BVH_TREE_DEPTH + 1 = 17 
@@ -51,19 +53,21 @@ SPHERES_IDX : [..] int;
 // TODO(Goose): WHEN SPHERES IS A FIXED SIZE, USE THAT SIZE HERE. (2 * SPHERES.count) + 1. Imagine that we have 1 object per depth, that will be 2 nodes per object. Thus 2 * objects. +1 because of root node. Also, add a depth limiter, if too many objects.
 SPHERES_TREE : [..] BVHNode;
 
-// SPHERES_TREE : [..] BVHNode(Sphere);
-
 // The moving spheres will only create motion blur if MOTION_BLUR == true. Otherwise they will be erndered the same as static spheres 
 MOVING_SPHERES : [..]  MovingSphere;
 MOVING_SPHERES_IDX : [..]  int;
 MOVING_SPHERES_TREE : [..]BVHNode;
 
-DIFFUSE_DATA : [..] DiffuseData;
+/* MATERIAL DATA */
+DIFFUSE_DATA : [..] MaterialDiffuse;
 
-METAL_DATA : [..]  MetalData;
+METAL_DATA : [..]  MaterialMetal;
 
-DIELECTRIC_DATA : [..] DielectricData;
+DIELECTRIC_DATA : [..] MaterialDielectric;
 
+/* TEXTURE DATA */
+TEXTURE_SOLID : [..] TextureSolid;
+TEXTURE_CHECKERED : [..] TextureCheckered;
 
 threadGroup: Thread_Group;
 pool: Pool;
@@ -76,9 +80,16 @@ jpgData : *JPGData;
 main :: ()
 {
     setupCamera();
-    setupScene1();
-    // setupScene2();
-    // setupScene3();
+    #if SCENE_TO_RENDER ==
+    {
+        case 0;
+            setupScene1();
+        case 1;
+            setupScene2();
+        case 2;
+            setupScene3();
+    }
+
     createTree(Sphere);
 
 
@@ -176,19 +187,38 @@ setupThreadGroup :: ()
 
 }
 
+/* Scene setup functions*/
+
+/* Creates a big scene with dozens of static spheres around 3 big spheres. Each of a different material. */
 setupScene1 :: () 
 {
     //TODO(Goose): we know how many spheres are in the scene. The arrays can be statically allocated for this scene
+
+    /* Allocate the known textures, such as the dielectric texture */
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
+
+    array_add(*TEXTURE_CHECKERED, makeTextureCheckered(Vector3.{1,1,1}, Vector3.{0.2, 0.5, 0.2}));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TextureCheckered, TEXTURE_CHECKERED.count -1));
+
+    // attenuation := make_vector3(0.5) + (generateRandomVec3() * 0.5);
+    // fuzz := random_get_zero_to_one() * 0.5;
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.6, 0.6, 0.6}));
+    array_add(*METAL_DATA, makeMaterialMetal(make_vector3(0.8), TextureSolid, TEXTURE_SOLID.count - 1, 0.1));
+
+    TEXTURE_WHITE_IDX :: 0;
+
     // Static location of spheres
-    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
-    array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, Materials.DIFFUSE, 1});
-    array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, Materials.DIELECTRIC, 0});
-    array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, Materials.METAL, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, MaterialType.DIFFUSE, 2});
+    array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, MaterialType.DIELECTRIC, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, MaterialType.METAL, 0});
    
+   
+    array_add(*DIELECTRIC_DATA, makeMaterialDielectric(Vector3.{1,1,1}, TextureSolid, TEXTURE_WHITE_IDX, 1.5));
+
+    array_add(*DIFFUSE_DATA, MaterialDiffuse.{Vector3.{0.5, 0.5, 0.5}, TextureSolid, TEXTURE_WHITE_IDX});
+
     // Random location of spheres
-   
-    array_add(*DIELECTRIC_DATA, DielectricData.{Vector3.{1,1,1}, 1.5});
-    array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});
     for x: -11..11
     {
         for y: -11..11
@@ -212,55 +242,72 @@ setupScene1 :: ()
             // Diffuse
             if materialChance < 0.8
             {
-                color := generateRandomVec3() * generateRandomVec3();
+                color := generateRandomVec3();
+                array_add(*TEXTURE_SOLID, TextureSolid.{color});
+                attenuation := generateRandomVec3();
 
-                array_add(*DIFFUSE_DATA, DiffuseData.{color});
-                array_add(*SPHERES, Sphere.{pos, 0.2, Materials.DIFFUSE, DIFFUSE_DATA.count - 1});
+                array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, TEXTURE_SOLID.count - 1));
+                array_add(*SPHERES, Sphere.{pos, 0.2, MaterialType.DIFFUSE, DIFFUSE_DATA.count - 1});
 
             }
             // Metal
             else if materialChance < 0.95
             {
-                array_add(*METAL_DATA, MetalData.{make_vector3(0.5) + (generateRandomVec3() * 0.5), random_get_zero_to_one() * 0.5});
-                array_add(*SPHERES, Sphere.{pos, 0.2, Materials.METAL, METAL_DATA.count - 1});
+                attenuation := make_vector3(0.5) + (generateRandomVec3() * 0.5);
+                fuzz := random_get_zero_to_one() * 0.5;
+                array_add(*METAL_DATA, makeMaterialMetal(attenuation, TextureSolid, TEXTURE_WHITE_IDX, fuzz));
+                array_add(*SPHERES, Sphere.{pos, 0.2, MaterialType.METAL, METAL_DATA.count - 1});
             }
             // Glass
             else
             {
-                array_add(*SPHERES, Sphere.{pos, 0.2, Materials.DIELECTRIC, DIELECTRIC_DATA.count - 1});
+                array_add(*SPHERES, Sphere.{pos, 0.2, MaterialType.DIELECTRIC, DIELECTRIC_DATA.count - 1});
             }
         }
     }
 }
 
-// Motion blur scene
+/* Motion blur scene */
 setupScene2 :: () 
 {
     //TODO(Goose): we know how many spheres are in the scene. The arrays can be statically allocated for this scene
     // Static location of spheres
-    array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});
-    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
 
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(make_vector3(0.5, 0.5, 0.5), TextureSolid, 0));
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 0});
+
+    attenuation := generateRandomVec3() * generateRandomVec3();
     color := generateRandomVec3() * generateRandomVec3();
-    array_add(*DIFFUSE_DATA, DiffuseData.{color});
-    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
-    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
-    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
-    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, Materials.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, 1));
+    array_add(*TEXTURE_SOLID, makeTextureSolid(color));
+
+    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, MaterialType.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
+    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, MaterialType.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
+    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, MaterialType.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
+    array_add(*MOVING_SPHERES, MovingSphere.{Sphere.{Vector3.{0.0, 1.5, 0.0}, 1, MaterialType.DIFFUSE, 1}, Vector3.{0.0, 1.0, 0.0}, SHUTTER_TIME - 0.2 });
 }
 
-// 2 static sphere scene for testing
+/* Some static spheres scene that render quickly for testing */
 setupScene3 :: () 
 {
-    // Static location of spheres
-    array_add(*DIFFUSE_DATA, DiffuseData.{Vector3.{0.5, 0.5, 0.5}});
-    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, Materials.DIFFUSE, 0});
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
 
+    attenuation := generateRandomVec3() * generateRandomVec3();
     color := generateRandomVec3() * generateRandomVec3();
-    array_add(*DIFFUSE_DATA, DiffuseData.{color});
-    array_add(*SPHERES, Sphere.{Vector3.{0.0, 3.5, 0.0}, 1, Materials.DIFFUSE, 1});
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, 1));
+    array_add(*TEXTURE_SOLID, makeTextureSolid(color));
 
-    array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, Materials.DIFFUSE, 1});
-    array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, Materials.DIFFUSE, 0});
-    array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, Materials.DIFFUSE, 1});
+    // Static location of spheres
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{0.5, 0.5, 0.5}, TextureSolid, 0));
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 0});
+
+    color = generateRandomVec3() * generateRandomVec3();
+    array_add(*TEXTURE_SOLID, makeTextureSolid(color));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(color, TextureSolid, 0));
+    array_add(*SPHERES, Sphere.{Vector3.{0.0, 3.5, 0.0}, 1, MaterialType.DIFFUSE, 1});
+
+    array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, MaterialType.DIFFUSE, 1});
+    array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, MaterialType.DIFFUSE, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, MaterialType.DIFFUSE, 1});
 }

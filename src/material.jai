@@ -1,0 +1,125 @@
+/**
+*   Texture application and functions for objects   
+*/
+
+#import "Basic";
+#import "Math";
+
+//TODO(Goose): This can be replaced by compile time Type verification. This is a solution "A la C"
+
+/* Material definition */
+
+MaterialType :: enum u8
+{
+    DIFFUSE :: 0;
+    METAL;
+    DIELECTRIC; //Materials like water and glass
+    EMISSIVE;
+}
+
+
+// Material :: struct(T)
+// {
+//     attenuation : Vector3;
+//     textureType : T;
+//     textureIdx : u64;
+// }
+
+MaterialDiffuse :: struct
+{
+    attenuation : Vector3;
+    textureType : Type;
+    textureIdx : int;
+}
+
+MaterialMetal :: struct
+{
+    using material : MaterialDiffuse;
+    fuzz : float;
+}
+
+MaterialDielectric :: struct
+{
+    using material : MaterialDiffuse;
+    indexOfRefraction : float;
+}
+
+/* *** */
+/* Texture definition */
+
+// TEXTURE_SOLID : [..] ConstantTexture;
+
+// Textures :: enum u8
+// {
+//     SOLID :: 0;
+// }
+
+/* The classic single colored texture. */
+TextureSolid :: struct
+{
+    color : Vector3;
+}
+
+TextureCheckered :: struct
+{
+    using texture : TextureSolid;
+    color2 : Vector3;
+}
+
+makeMaterialDiffuse :: (attenuation : Vector3, textureType : Type, textureIdx : int ) -> MaterialDiffuse
+{
+    return .{attenuation, textureType, textureIdx};
+}
+
+makeMaterialDielectric :: (attenuation : Vector3, textureType : Type, textureIdx : int, fuzz : float) -> MaterialDielectric
+{
+    return .{MaterialDiffuse.{attenuation, textureType, textureIdx}, fuzz};
+}
+
+makeMaterialMetal :: (attenuation : Vector3, textureType : Type, textureIdx : int, indexOfRefraction : float) -> MaterialMetal
+{
+    return .{MaterialDiffuse.{attenuation, textureType, textureIdx}, indexOfRefraction};
+}
+
+makeTextureSolid :: (color : Vector3) -> TextureSolid
+{
+    return .{color};
+}
+
+makeTextureCheckered :: (color1 : Vector3, color2 : Vector3) -> TextureCheckered
+{
+    return .{TextureSolid.{color1}, color2};
+}
+
+/* Gets a texture color  */
+getTextureAtUV :: (textureType : Type, uv : Vector2, position : Vector3, idx : int) -> Vector3
+{
+    /* TODO(Goose): this switch is done at runtime. Make it at compile-time */
+    if textureType ==
+    {
+        case TextureSolid;
+            return TEXTURE_SOLID[idx].color;
+
+        case TextureCheckered;
+            return calculateTextureCheckered(uv, position, idx);
+
+        case;
+            assert(false, "Texture of type: % is not implemented", textureType);
+    }
+    return Vector3.{0, 0, 0};
+}
+
+calculateTextureCheckered :: (uv : Vector2, position : Vector3, idx : int) -> Vector3
+{
+    texData := TEXTURE_CHECKERED[idx];
+    sinVal := sin(10 * position.x) * sin(10 * position.y) * sin(10 * position.z);
+    
+    if sinVal < 0.0
+    {
+        return texData.color;
+    }
+    else
+    {
+        return texData.color2;
+    }
+}
