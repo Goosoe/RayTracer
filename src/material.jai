@@ -66,6 +66,12 @@ TextureCheckered :: struct
     color2 : Vector3;
 }
 
+TexturePerlin :: struct
+{
+    using texture : TextureSolid;
+    perlin : PerlinNoise;
+}
+
 makeMaterialDiffuse :: (attenuation : Vector3, textureType : Type, textureIdx : int ) -> MaterialDiffuse
 {
     return .{attenuation, textureType, textureIdx};
@@ -91,6 +97,11 @@ makeTextureCheckered :: (color1 : Vector3, color2 : Vector3) -> TextureCheckered
     return .{TextureSolid.{color1}, color2};
 }
 
+makeTexturePerlin :: (color : Vector3) -> TexturePerlin
+{
+    return .{TextureSolid.{color}, makePerlinNoise()};
+}
+
 /* Gets a texture color  */
 getTextureAtUV :: (textureType : Type, uv : Vector2, position : Vector3, idx : int) -> Vector3
 {
@@ -102,6 +113,11 @@ getTextureAtUV :: (textureType : Type, uv : Vector2, position : Vector3, idx : i
 
         case TextureCheckered;
             return calculateTextureCheckered(uv, position, idx);
+
+        case TexturePerlin;
+        //     return calculateTextureCheckered(uv, position, idx);
+        tex := TEXTURE_PERLIN[idx];
+            return tex.color * getNoise(*tex.perlin, position);
 
         case;
             assert(false, "Texture of type: % is not implemented", textureType);

@@ -11,6 +11,7 @@
 #load "ray.jai";
 #load "renderer.jai";
 #load "BVH.jai";
+#load "perlin.jai";
 
 IMAGE_X :: 1920;
 IMAGE_Y :: 1080;
@@ -20,7 +21,7 @@ NUM_THREADS :: 10;
 
 NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
 
-SCENE_TO_RENDER :: 0;
+SCENE_TO_RENDER :: 5;
 FILE_OUTPUT :: "out.jpg";
 
 
@@ -40,8 +41,9 @@ FragmentData :: struct
     jpgDataPos : int;
 }
 
-// TODO(Goose): check for need to allocate memory for these data arrays
 
+
+// TODO(Goose): create a separate program that runs and generates a file with a static .jai representation of these arrays.
 /*scene data*/
 SPHERES : [..]  Sphere;
 SPHERES_IDX : [..] int;
@@ -68,6 +70,7 @@ DIELECTRIC_DATA : [..] MaterialDielectric;
 /* TEXTURE DATA */
 TEXTURE_SOLID : [..] TextureSolid;
 TEXTURE_CHECKERED : [..] TextureCheckered;
+TEXTURE_PERLIN : [..] TexturePerlin;
 
 threadGroup: Thread_Group;
 pool: Pool;
@@ -77,17 +80,25 @@ jpgData : *JPGData;
 /*
 * Initializes data and requests data per pixel of the image. Outputs an image a .jpg in the end
 */
+
+
 main :: ()
 {
     setupCamera();
     #if SCENE_TO_RENDER ==
     {
-        case 0;
-            setupScene1();
         case 1;
-            setupScene2();
+            setupScene1();
         case 2;
+            setupScene2();
+        case 3;
             setupScene3();
+        case 4;
+            setupScene4();
+        case 5;
+            setupScene5();
+        case;
+            assert(false, "Invalid scene number selected: %\n", SCENE_TO_RENDER);
     }
 
     createTree(Sphere);
@@ -189,7 +200,7 @@ setupThreadGroup :: ()
 
 /* Scene setup functions*/
 
-/* Creates a big scene with dozens of static spheres around 3 big spheres. Each of a different material. */
+/* Creates a big scene with dozens of static spheres around 3 big spheres. Each of a different material. The floor sphere is checkered */
 setupScene1 :: () 
 {
     //TODO(Goose): we know how many spheres are in the scene. The arrays can be statically allocated for this scene
@@ -200,10 +211,8 @@ setupScene1 :: ()
     array_add(*TEXTURE_CHECKERED, makeTextureCheckered(Vector3.{1,1,1}, Vector3.{0.2, 0.5, 0.2}));
     array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TextureCheckered, TEXTURE_CHECKERED.count -1));
 
-    // attenuation := make_vector3(0.5) + (generateRandomVec3() * 0.5);
-    // fuzz := random_get_zero_to_one() * 0.5;
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.6, 0.6, 0.6}));
-    array_add(*METAL_DATA, makeMaterialMetal(make_vector3(0.8), TextureSolid, TEXTURE_SOLID.count - 1, 0.1));
+    array_add(*METAL_DATA, makeMaterialMetal(make_vector3(0.8), TextureSolid, TEXTURE_SOLID.count - 1, 0.001));
 
     TEXTURE_WHITE_IDX :: 0;
 
@@ -310,4 +319,99 @@ setupScene3 :: ()
     array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, MaterialType.DIFFUSE, 1});
     array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, MaterialType.DIFFUSE, 0});
     array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, MaterialType.DIFFUSE, 1});
+}
+
+/* Creates a big scene with dozens of static spheres around 3 big spheres. Each of a different material. The floor sphere is a random perlin noise. Similar to scene1 */
+setupScene4 :: () 
+{
+    //TODO(Goose): we know how many spheres are in the scene. The arrays can be statically allocated for this scene
+
+    /* Allocate the known textures, such as the dielectric texture */
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
+
+    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{1,1,1}));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TexturePerlin, TEXTURE_PERLIN.count -1));
+
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.6, 0.6, 0.6}));
+    array_add(*METAL_DATA, makeMaterialMetal(make_vector3(0.8), TextureSolid, TEXTURE_SOLID.count - 1, 0.001));
+
+    TEXTURE_WHITE_IDX :: 0;
+
+    // Static location of spheres
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{-2.5, 1, 0.5}, 1, MaterialType.DIFFUSE, 2});
+    array_add(*SPHERES, Sphere.{Vector3.{0, 1, 0}, 1, MaterialType.DIELECTRIC, 0});
+    array_add(*SPHERES, Sphere.{Vector3.{2.5, 1, -0.5}, 1, MaterialType.METAL, 0});
+   
+   
+    array_add(*DIELECTRIC_DATA, makeMaterialDielectric(Vector3.{1,1,1}, TextureSolid, TEXTURE_WHITE_IDX, 1.5));
+
+    array_add(*DIFFUSE_DATA, MaterialDiffuse.{Vector3.{0.5, 0.5, 0.5}, TextureSolid, TEXTURE_WHITE_IDX});
+
+    // Random location of spheres
+    for x: -11..11
+    {
+        for y: -11..11
+        {
+            materialChance := random_get_zero_to_one();
+            pos := Vector3.{x + 0.9 * random_get_zero_to_one(), 0.15, y + 0.9 * random_get_zero_to_one()};
+            tooCloseToBigSpheres := false;
+
+            for 1..3{
+                if length(pos - SPHERES[it].center) <= 1.5 * SPHERES[it].radius
+                {
+                    tooCloseToBigSpheres = true;
+                    break;
+                }
+            }
+            // if it's too close, we want to skip adding this sphere
+            if length(pos - Vector3.{4, 0.2, 0}) < 0.9 || tooCloseToBigSpheres
+            {
+                continue;
+            }
+            // Diffuse
+            if materialChance < 0.8
+            {
+                color := generateRandomVec3();
+                array_add(*TEXTURE_SOLID, TextureSolid.{color});
+                attenuation := generateRandomVec3();
+
+                array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, TEXTURE_SOLID.count - 1));
+                array_add(*SPHERES, Sphere.{pos, 0.2, MaterialType.DIFFUSE, DIFFUSE_DATA.count - 1});
+
+            }
+            // Metal
+            else if materialChance < 0.95
+            {
+                attenuation := make_vector3(0.5) + (generateRandomVec3() * 0.5);
+                fuzz := random_get_zero_to_one() * 0.5;
+                array_add(*METAL_DATA, makeMaterialMetal(attenuation, TextureSolid, TEXTURE_WHITE_IDX, fuzz));
+                array_add(*SPHERES, Sphere.{pos, 0.2, MaterialType.METAL, METAL_DATA.count - 1});
+            }
+            // Glass
+            else
+            {
+                array_add(*SPHERES, Sphere.{pos, 0.2, MaterialType.DIELECTRIC, DIELECTRIC_DATA.count - 1});
+            }
+        }
+    }
+}
+
+/* Some static spheres scene that render quickly for testing */
+setupScene5 :: () 
+{
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
+
+    attenuation := generateRandomVec3() * generateRandomVec3();
+    color := generateRandomVec3() * generateRandomVec3();
+    array_add(*TEXTURE_SOLID, makeTextureSolid(color));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, 1));
+
+    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{1,1,1}));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TexturePerlin, TEXTURE_PERLIN.count -1));
+    // Static location of spheres
+    // array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{0.5, 0.5, 0.5}, TextureSolid, 0));
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 1});
+
+    array_add(*SPHERES, Sphere.{Vector3.{0, 2, 0}, 2, MaterialType.DIFFUSE, 1});
 }
