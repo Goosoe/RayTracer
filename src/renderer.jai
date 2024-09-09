@@ -21,7 +21,7 @@ BLACK :: Vector3.{0, 0, 0};
 
 /* Motion blur */
 //For how long the shutter will stay "open". It will go from [0.0, SHUTTER_TIME]
-MOTION_BLUR :: true;
+MOTION_BLUR :: false;
 SHUTTER_TIME :: 2;
 /* Render Data */
 MAX_RAYS :: 100;

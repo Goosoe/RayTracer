@@ -100,3 +100,15 @@ createBoundingBox :: () -> BoundingBox
         STATIC_OBJECT
     };
 }
+
+copyVector :: (toCopy : *Vector3, destination : *Vector3)
+{
+    destination.x = toCopy.x;
+    destination.y = toCopy.y;
+    destination.z = toCopy.z;
+}
+
+printVector :: (vec : Vector3)
+{
+    print("x: %, y: %, z: %\n", vec.x, vec.y, vec.z);
+}

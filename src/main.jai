@@ -21,7 +21,7 @@ NUM_THREADS :: 10;
 
 NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
 
-SCENE_TO_RENDER :: 5;
+SCENE_TO_RENDER :: 6;
 FILE_OUTPUT :: "out.jpg";
 
 
@@ -58,7 +58,7 @@ SPHERES_TREE : [..] BVHNode;
 // The moving spheres will only create motion blur if MOTION_BLUR == true. Otherwise they will be erndered the same as static spheres 
 MOVING_SPHERES : [..]  MovingSphere;
 MOVING_SPHERES_IDX : [..]  int;
-MOVING_SPHERES_TREE : [..]BVHNode;
+MOVING_SPHERES_TREE : [..] BVHNode;
 
 /* MATERIAL DATA */
 DIFFUSE_DATA : [..] MaterialDiffuse;
@@ -97,12 +97,13 @@ main :: ()
             setupScene4();
         case 5;
             setupScene5();
+        case 6;
+            setupScene6();
         case;
             assert(false, "Invalid scene number selected: %\n", SCENE_TO_RENDER);
     }
 
     createTree(Sphere);
-
 
     setupThreadGroup();
 #if MULTI_THREAD
@@ -131,11 +132,11 @@ main :: ()
         {
 #if MULTI_THREAD
 {
-        defer jpgData.it += JPG_CHANNELS;
-        fragmentData := New(FragmentData,, allocator);
-        fragmentData.coords = Vector2.{cast(float)x, cast(float)y};
-        fragmentData.jpgDataPos = jpgData.it; 
-        add_work(*threadGroup, fragmentData, tprint("Work item %", jpgData.it));
+            defer jpgData.it += JPG_CHANNELS;
+            fragmentData := New(FragmentData,, allocator);
+            fragmentData.coords = Vector2.{cast(float)x, cast(float)y};
+            fragmentData.jpgDataPos = jpgData.it; 
+            add_work(*threadGroup, fragmentData, tprint("Work item %", jpgData.it));
 
 }
 else
@@ -209,6 +210,7 @@ setupScene1 :: ()
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
 
     array_add(*TEXTURE_CHECKERED, makeTextureCheckered(Vector3.{1,1,1}, Vector3.{0.2, 0.5, 0.2}));
+
     array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TextureCheckered, TEXTURE_CHECKERED.count -1));
 
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.6, 0.6, 0.6}));
@@ -329,7 +331,7 @@ setupScene4 :: ()
     /* Allocate the known textures, such as the dielectric texture */
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
 
-    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{1,1,1}));
+    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{0.5,0.5,0.5}, 7.0));
     array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TexturePerlin, TEXTURE_PERLIN.count -1));
 
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.6, 0.6, 0.6}));
@@ -397,21 +399,38 @@ setupScene4 :: ()
     }
 }
 
-/* Some static spheres scene that render quickly for testing */
+/* Some static spheres scene that render quickly with the Perlin texture that gives a marble like texture */
 setupScene5 :: () 
 {
+    // ADD TEXTURES
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
 
     attenuation := generateRandomVec3() * generateRandomVec3();
     color := generateRandomVec3() * generateRandomVec3();
     array_add(*TEXTURE_SOLID, makeTextureSolid(color));
-    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, 1));
+    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{0.5,0.5,0.5}, 7.0));
 
-    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{1,1,1}));
-    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TexturePerlin, TEXTURE_PERLIN.count -1));
-    // Static location of spheres
-    // array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{0.5, 0.5, 0.5}, TextureSolid, 0));
-    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 1});
+    // ADD MATERIALS
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, 1));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TexturePerlin, TEXTURE_PERLIN.count - 1));
 
     array_add(*SPHERES, Sphere.{Vector3.{0, 2, 0}, 2, MaterialType.DIFFUSE, 1});
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 0});
+}
+/* Some static spheres scene that render quickly for testing */
+setupScene6 :: () 
+{
+    // ADD TEXTURES
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
+
+    attenuation := generateRandomVec3() * generateRandomVec3();
+    color := generateRandomVec3() * generateRandomVec3();
+    array_add(*TEXTURE_SOLID, makeTextureSolid(color));
+
+    // ADD MATERIALS
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(attenuation, TextureSolid, 0));
+    array_add(*DIFFUSE_DATA, makeMaterialDiffuse(Vector3.{1,1,1}, TextureSolid, 1));
+
+    array_add(*SPHERES, Sphere.{Vector3.{0, 2, 0}, 2, MaterialType.DIFFUSE, 1});
+    array_add(*SPHERES, Sphere.{Vector3.{0, -500, 0}, 500, MaterialType.DIFFUSE, 0});
 }

@@ -27,7 +27,7 @@ createTree :: ($T : Type)
             /* Initialize the root node */
             node := array_add(*SPHERES_TREE);
             node.objectCount = cast(u64) SPHERES.count;
-            for 0..SPHERES.count - 1
+            for 0 .. SPHERES.count - 1
             {
                 array_add(*SPHERES_IDX, it);
             }
@@ -58,6 +58,7 @@ createTree :: ($T : Type)
             nodeIdx := SPHERES_TREE.count - 1;
             node := *SPHERES_TREE[nodeIdx];
             if node.objectCount == 0 return;
+
             bb := createSphereBoundingBox(SPHERES[SPHERES_IDX[node.firstObjectIdx]]);
 
             for 1 .. node.objectCount - 1
@@ -70,6 +71,7 @@ createTree :: ($T : Type)
             nodeIdx := MOVING_SPHERES_TREE.count - 1;
             node := *MOVING_SPHERES_TREE[nodeIdx];
             if node.objectCount == 0 return;
+
             bb := createSphereBoundingBox(MOVING_SPHERES[MOVING_SPHERES_IDX[node.firstObjectIdx]]);
 
             for 1 .. node.objectCount - 1
@@ -81,7 +83,6 @@ createTree :: ($T : Type)
         case;
             assert(false, "Shouldn't have gotten here. Some type is wrong");
         }
-
 }
 
 /* Recursive call from createTree*/
@@ -91,6 +92,7 @@ subdivide :: ($T : Type, currentDepth : u64 = 0) //-> bool //*BVHNode():
     {
         case Sphere;
             node := SPHERES_TREE[SPHERES_TREE.count - 1];
+
             if node.objectCount < 2 return;
             
 
@@ -111,8 +113,7 @@ subdivide :: ($T : Type, currentDepth : u64 = 0) //-> bool //*BVHNode():
             /* Use these indexes for organizing the object list in left and right of spliPos*/
             leftIdx : u64 = node.firstObjectIdx;
             rightIdx : u64 = cast(u64) node.objectCount - 1;
-
-            while leftIdx <= rightIdx
+            while leftIdx < rightIdx
             {
                 if getAxis(axis, SPHERES[leftIdx].center) < splitPos
                 {
@@ -165,7 +166,7 @@ subdivide :: ($T : Type, currentDepth : u64 = 0) //-> bool //*BVHNode():
             leftIdx : u64 = node.firstObjectIdx;
             rightIdx : u64 = cast(u64) node.objectCount - 1;
 
-            while leftIdx <= rightIdx
+            while leftIdx < rightIdx
             {
                 if getAxis(axis, MOVING_SPHERES[leftIdx].center) < splitPos
                 {
@@ -201,6 +202,8 @@ subdivide :: ($T : Type, currentDepth : u64 = 0) //-> bool //*BVHNode():
 
     updateNodeBounds(T, currentDepth + 1);
     updateNodeBounds(T, currentDepth + 1);
+
+    if leftIdx == rightIdx return;
 
     subdivide(T, currentDepth + 1);
     subdivide(T, currentDepth + 1);

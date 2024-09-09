@@ -1,5 +1,5 @@
 /**
-*   Perlin noise implementation
+*   Perlin noise texture implementation that gives a marble like texture.
 */
 
 #import "Basic";
@@ -12,7 +12,7 @@ PerlinNoise :: struct
     xPerm : [PERLIN_POINT_COUNT] int;
     yPerm : [PERLIN_POINT_COUNT] int;
     zPerm : [PERLIN_POINT_COUNT] int;
-    rand : [PERLIN_POINT_COUNT] float;
+    rand : [PERLIN_POINT_COUNT] Vector3;
 }
 
 makePerlinNoise :: () -> PerlinNoise
@@ -39,79 +39,85 @@ makePerlinNoise :: () -> PerlinNoise
     }
 
     perlin := PerlinNoise.{};
-    for 0 .. PERLIN_POINT_COUNT - 1 perlin.rand[it] = random_get_zero_to_one();
+    for 0 .. PERLIN_POINT_COUNT - 1 perlin.rand[it] = generateRandomVec3(-1, 1);
 
     fillPermArrays(*perlin);
     return perlin;
 }
 
-getNoise :: (perlinNoise : *PerlinNoise, pos : Vector3) -> float
+
+/* Gets a sum of *depth* linear interpolated noises with some added turbulence */
+getPerlinTurbulence :: (texPerlin : *TexturePerlin, pos : Vector3, depth : int) -> float
 {
-    a : int = cast(int)(4 * pos.x);
-    a &= PERLIN_POINT_COUNT - 1;
-    b : int = cast(int)(4 * pos.y);
-    b &= PERLIN_POINT_COUNT - 1;
-    c : int = cast(int)(4 * pos.z);
-    c &= PERLIN_POINT_COUNT - 1;
-    return perlinNoise.rand[perlinNoise.xPerm[a] ^ perlinNoise.xPerm[b] ^ perlinNoise.xPerm[c]];
-}
+    //TODO(Goose): There is a better way that we can do this... (arr of arrs)
+    interp :: (arr: [2][2][2] Vector3, u: float, v: float, w: float) -> float
+    {
+        accum : float = 0.0;
 
-/* Linear interpolated noise*/
-getLinearNoise :: (perlinNoise : *PerlinNoise, pos : Vector3) -> float
-{
-        //     static double trilinear_interp(double c[2][2][2], double u, double v, double w) {
-        //     auto accum = 0.0;
-        //     for (int i=0; i < 2; i++)
-        //         for (int j=0; j < 2; j++)
-        //             for (int k=0; k < 2; k++)
-        //                 accum += (i*u + (1-i)*(1-u))*
-        //                         (j*v + (1-j)*(1-v))*
-        //                         (k*w + (1-k)*(1-w))*c[i][j][k];
-        //
-        //     return accum;
-        // }
+        // Hermitian Smoothing
+        uu : float = u * u * (3 - 2 * u);
+        vv : float = v * v * (3 - 2 * v);
+        ww : float = w * w * (3 - 2 * w);
 
-//        auto u = p.x() - floor(p.x());
-//             auto v = p.y() - floor(p.y());
-//             auto w = p.z() - floor(p.z());
-    u := pos.x - floor(pos.x);
-    v := pos.y - floor(pos.y);
-    w := pos.z - floor(pos.z);
+        for i: 0..1
+        {
+            for j: 0..1
+            {
+                for k: 0..1
+                {
+                    vWeight : Vector3 = Vector3.{u - i, v - j, w - k};
+                    accum += (i * uu + (1.0 - i) * (1.0 - uu)) *
+                    (j * vv + (1.0 - j) * (1.0 - vv)) *
+                    (k * ww + (1.0 - k) * (1.0 - ww)) *
+                    dot_product(arr[i][j][k], vWeight);
+                }
+            }
+        }
+        return accum;
+    }
+    /* Linear interpolated noise, does not apply the scaling values*/
+    getPerlinNoise :: (texPerlin : *TexturePerlin, pos : Vector3) -> float
+    {
 
-    i := cast(int) floor(pos.x);
-    j := cast(int) floor(pos.y);
-    k := cast(int) floor(pos.z);
+        u := pos.x - floor(pos.x);
+        v := pos.y - floor(pos.y);
+        w := pos.z - floor(pos.z);
 
-    arr := [6] float;
-    // for arr
-    // {
-    //     it = 
-    // }
-    // for 0 .. 1
-    // {
-    //     perlinNoise.xPerm[it] ^ perlinNoise.xPerm[it + 2] ^ perlinNoise.xPerm[it + 4];
-    // }
-//
-//             auto i = static_cast<int>(floor(p.x()));
-//             auto j = static_cast<int>(floor(p.y()));
-//             auto k = static_cast<int>(floor(p.z()));
-//             double c[2][2][2];
-//
-//             for (int di=0; di < 2; di++)
-//                 for (int dj=0; dj < 2; dj++)
-//                     for (int dk=0; dk < 2; dk++)
-//                         c[di][dj][dk] = ranfloat[
-//                             perm_x[(i+di) & 255] ^
-//                             perm_y[(j+dj) & 255] ^
-//                             perm_z[(k+dk) & 255]
-//                         ];
-//
-//             return trilinear_interp(c, u, v, w);
-    a : int = cast(int)(4 * pos.x);
-    a &= PERLIN_POINT_COUNT - 1;
-    b : int = cast(int)(4 * pos.y);
-    b &= PERLIN_POINT_COUNT - 1;
-    c : int = cast(int)(4 * pos.z);
-    c &= PERLIN_POINT_COUNT - 1;
-    return perlinNoise.rand[perlinNoise.xPerm[a] ^ perlinNoise.xPerm[b] ^ perlinNoise.xPerm[c]];
+
+        i := cast(int) floor(pos.x);
+        j := cast(int) floor(pos.y);
+        k := cast(int) floor(pos.z);
+
+        //TODO(Goose): There is a better way that we can do this...
+        arr : [2] [2] [2] Vector3;
+        perlinNoise : *PerlinNoise = *texPerlin.perlin;
+        for di: 0..1
+        {
+            for dj: 0..1
+            {
+                for dk: 0..1
+                {
+                    arr[di][dj][dk] =  perlinNoise.rand[
+                        perlinNoise.xPerm[(i + di) & 255] ^
+                        perlinNoise.yPerm[(j + dj) & 255] ^
+                        perlinNoise.zPerm[(k + dk) & 255]
+                    ];
+                }
+            }
+        }
+        return interp(arr, u, v, w);
+    }
+
+    accum : float = 0.0;
+    weight : float = 1.0;
+    tmpPos : Vector3 = pos;
+
+    for 0..depth - 1
+    {
+        accum += weight * getPerlinNoise(texPerlin, tmpPos);
+        weight *= 0.6;
+        tmpPos *= 2;
+    }
+
+    return abs(accum);
 }

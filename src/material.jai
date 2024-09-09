@@ -69,6 +69,7 @@ TextureCheckered :: struct
 TexturePerlin :: struct
 {
     using texture : TextureSolid;
+    scale : float;
     perlin : PerlinNoise;
 }
 
@@ -97,9 +98,9 @@ makeTextureCheckered :: (color1 : Vector3, color2 : Vector3) -> TextureCheckered
     return .{TextureSolid.{color1}, color2};
 }
 
-makeTexturePerlin :: (color : Vector3) -> TexturePerlin
+makeTexturePerlin :: (color : Vector3, scale : float) -> TexturePerlin
 {
-    return .{TextureSolid.{color}, makePerlinNoise()};
+    return .{TextureSolid.{color}, scale, makePerlinNoise()};
 }
 
 /* Gets a texture color  */
@@ -115,9 +116,8 @@ getTextureAtUV :: (textureType : Type, uv : Vector2, position : Vector3, idx : i
             return calculateTextureCheckered(uv, position, idx);
 
         case TexturePerlin;
-        //     return calculateTextureCheckered(uv, position, idx);
         tex := TEXTURE_PERLIN[idx];
-            return tex.color * getNoise(*tex.perlin, position);
+             return tex.color * (1 + sin(tex.scale * position.z + 10 * getPerlinTurbulence(*tex, position, 7)));
 
         case;
             assert(false, "Texture of type: % is not implemented", textureType);
