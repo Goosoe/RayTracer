@@ -18,15 +18,8 @@ BoundingBox :: struct //($T : Type)
     // objects : [..] T;
 }
 
-// MovingBoundingBox :: struct
-// {
-//     box : BoundingBox;
-//     /* BoundingBox will use this value as the upper bount to calculate its position [0, time]*/
-//     time : float;
-// }
-
 /**
-* Creates a bounding box for a static object
+* Creates a BoundingBox for a static Sphere object
 */ 
 createSphereBoundingBox :: (sphere : Sphere) -> BoundingBox
 {
@@ -37,6 +30,9 @@ createSphereBoundingBox :: (sphere : Sphere) -> BoundingBox
     };
 }
 
+/**
+* Creates a BoundingBox for a moving Sphere object
+*/ 
 createSphereBoundingBox :: (sphere : MovingSphere) -> BoundingBox
 {
     b1 := BoundingBox.{
@@ -50,13 +46,47 @@ createSphereBoundingBox :: (sphere : MovingSphere) -> BoundingBox
         sphere.center1 + make_vector3(sphere.radius, sphere.sphere.radius, sphere.sphere.radius),
         sphere.movingTime
     };
-    return createSurroundingBox(b1, b2);
+    return createSurroundingBox(*b1, *b2);
+}
+
+/**
+* Creates a BoundingBox for a static quad
+*/
+createQuadBoundingBox :: (quad : Quad) -> BoundingBox
+{
+    // if the quad is parallel to a duo of axis, add a padding for the bounding box. Because quads, being planes, and therefore 2D, might break the BVH algorithm if we send a plane box as well
+    padBoundingBox :: (box : *BoundingBox)
+    {
+        PAD_DELTA : float :  0.0001;
+        if abs(box.min.x - box.max.x) < PAD_DELTA
+        {
+            box.min.x -= PAD_DELTA;
+            box.max.x += PAD_DELTA;
+        }
+        else if abs(box.min.y - box.max.y) < PAD_DELTA
+        {
+            box.min.y -= PAD_DELTA;
+            box.max.y += PAD_DELTA;
+        }
+        else if abs(box.min.z - box.max.z) < PAD_DELTA
+        {
+            box.min.z -= PAD_DELTA;
+            box.max.z += PAD_DELTA;
+        }
+    }
+    // Compute the bounding box of all four vertices.
+    b1 := BoundingBox.{quad.point, quad.point + quad.u + quad.v, STATIC_OBJECT};
+    b2 := BoundingBox.{quad.point + quad.u, quad.point + quad.v, STATIC_OBJECT};
+
+    bb := createSurroundingBox(*b1, *b2);
+    padBoundingBox(*bb);
+    return bb;
 }
 
 /**
 * Creates a BoundingBox that encompasses two given bounding boxes
 */
-createSurroundingBox :: (box1 : BoundingBox, box2 : BoundingBox) -> BoundingBox
+createSurroundingBox :: (box1 : *BoundingBox, box2 : *BoundingBox) -> BoundingBox
 {
     minVals := make_vector3(min(box1.min.x, box2.min.x),
         min(box1.min.y, box2.min.y),
@@ -72,9 +102,7 @@ createSurroundingBox :: (box1 : BoundingBox, box2 : BoundingBox) -> BoundingBox
 */
 checkBoundingBoxCollision :: (ray : Ray, box : BoundingBox, tMin : float = 0.001, tMax : float = FLOAT32_MAX) -> bool
 {
-    // return true;
-    // TODO: THIS IS NOT DOING THINGS PROPERLY
-    for 0..2
+    for 0 .. 2
     {
         inverseDir : float = 1 / getAxis(it, ray.direction);
         t0 := (getAxis(it, box.min) - getAxis(it, ray.origin)) * inverseDir;
@@ -85,7 +113,6 @@ checkBoundingBoxCollision :: (ray : Ray, box : BoundingBox, tMin : float = 0.001
         }
         minVal := max(tMin, t0);
         maxVal := min(tMax, t1); 
-        // print("% %\n", minVal, maxVal);
         if maxVal <= minVal
         {
             return false;
@@ -93,5 +120,3 @@ checkBoundingBoxCollision :: (ray : Ray, box : BoundingBox, tMin : float = 0.001
     }
     return true;
 }
-
-//TODO(Goose):create function that takes two bounding boxes and makes a bigger one that encompasses them both. Useful for moving objects or to create hierarchies

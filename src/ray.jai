@@ -43,7 +43,7 @@ getDiffuseRay :: (rayTime : float, hitData : HitData) -> Ray
     };
 }
 /* Gets the reflection ray of a static object with Metal material*/
-getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+getReflectRay :: (ray : Ray, hitData : HitData, materialData : MaterialData) -> Ray
 {
     reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
 
@@ -52,15 +52,15 @@ getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
         reflectDirection,
         ray.shutterTime
     };
-    if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+    if MATERIAL_METAL[materialData.materialId].fuzz > 0.0001 
     {
-        reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+        reflectRay.direction += MATERIAL_METAL[materialData.materialId].fuzz * generateRandomInUnitSphere();
     }
     return reflectRay;
 }
 
 /* Gets the reflection ray of a static object of material Type T*/
-getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -> Ray
+getReflectRay :: (ray : Ray, hitData : HitData, materialData : MaterialData, $T : Type) -> Ray
 {
     reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
 
@@ -73,9 +73,9 @@ getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -
     #if T ==
     {
         case MaterialMetal;
-            if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+            if MATERIAL_METAL[materialData.materialId].fuzz > 0.0001 
             {
-                reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+                reflectRay.direction += MATERIAL_METAL[materialData.materialId].fuzz * generateRandomInUnitSphere();
             }
             return reflectRay;
 
@@ -90,13 +90,13 @@ getReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -
 }
 
 /* Gets dielectric ray of a stsatic object */
-getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+getDielectricRay :: (ray : Ray, hitData : HitData, materialData : MaterialData) -> Ray
 {
-    refractionRatio := DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    refractionRatio := MATERIAL_DIELECTRIC[materialData.materialId].indexOfRefraction;
     assert(abs(refractionRatio) > 0.000001, "Index of Refraction cannot be 0, gotten index: %", refractionRatio);
     if hitData.frontFace 
     {
-        refractionRatio = 1.0 /  DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+        refractionRatio = 1.0 /  MATERIAL_DIELECTRIC[materialData.materialId].indexOfRefraction;
     }
     unitDirection := unit_vector(ray.direction);
 
@@ -112,7 +112,7 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
 
      if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
      {
-         return getReflectRay(ray, hitData, sphereHit, MaterialDielectric);
+         return getReflectRay(ray, hitData, materialData, MaterialDielectric);
      }
 
     return Ray.{
@@ -125,7 +125,7 @@ getDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
 /** MOVING OBJECTS RAY CALCULATIONS **/
 
 /* Gets the reflection ray of a static object with Metal material*/
-getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+getMovingReflectRay :: (ray : Ray, hitData : HitData, materialData : MaterialData) -> Ray
 {
     reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
 
@@ -134,15 +134,15 @@ getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
         reflectDirection,
         ray.shutterTime
     };
-    if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+    if MATERIAL_METAL[materialData.materialId].fuzz > 0.0001 
     {
-        reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+        reflectRay.direction += MATERIAL_METAL[materialData.materialId].fuzz * generateRandomInUnitSphere();
     }
     return reflectRay;
 }
 
 /* Gets the reflection ray of a static object of material Type T*/
-getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : Type) -> Ray
+getMovingReflectRay :: (ray : Ray, hitData : HitData, materialData : MaterialData, $T : Type) -> Ray
 {
     reflectDirection := unit_vector(ray.direction - (2 * dot_product(ray.direction, hitData.normal)) * hitData.normal);
 
@@ -155,9 +155,9 @@ getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : T
     #if T ==
     {
         case MaterialMetal;
-            if METAL_DATA[sphereHit.materialId].fuzz > 0.0001 
+            if MATERIAL_METAL[materialData.materialId].fuzz > 0.0001 
             {
-                reflectRay.direction += METAL_DATA[sphereHit.materialId].fuzz * generateRandomInUnitSphere();
+                reflectRay.direction += MATERIAL_METAL[materialData.materialId].fuzz * generateRandomInUnitSphere();
             }
             return reflectRay;
 
@@ -172,13 +172,13 @@ getMovingReflectRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere, $T : T
 }
 
 /* Gets dielectric ray of a stsatic object */
-getMovingDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> Ray
+getMovingDielectricRay :: (ray : Ray, hitData : HitData, materialData : MaterialData) -> Ray
 {
-    refractionRatio := DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+    refractionRatio := MATERIAL_DIELECTRIC[materialData.materialId].indexOfRefraction;
     assert(abs(refractionRatio) > 0.000001, "Index of Refraction cannot be 0, gotten index: %", refractionRatio);
     if hitData.frontFace 
     {
-        refractionRatio = 1.0 /  DIELECTRIC_DATA[sphereHit.materialId].indexOfRefraction;
+        refractionRatio = 1.0 /  MATERIAL_DIELECTRIC[materialData.materialId].indexOfRefraction;
     }
     unitDirection := unit_vector(ray.direction);
 
@@ -194,7 +194,7 @@ getMovingDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> 
 
      if sinTheta * refractionRatio > 1.0 || reflectance > random_get_zero_to_one()
      {
-         return getReflectRay(ray, hitData, sphereHit, MaterialDielectric);
+         return getReflectRay(ray, hitData, materialData, MaterialDielectric);
      }
 
     return Ray.{
@@ -203,3 +203,8 @@ getMovingDielectricRay :: (ray : Ray, hitData : HitData, sphereHit : Sphere) -> 
         ray.shutterTime
     };
 }
+
+// getEmissiveRay :: ( ) -> Ray
+// {
+//
+// }

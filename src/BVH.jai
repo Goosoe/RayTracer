@@ -40,17 +40,21 @@ createTree :: ($T : Type)
             {
                 array_add(*MOVING_SPHERES_IDX, it);
             }
+        case Quad;
+            //TODO(Goose): implement me
+            print("Implement createTree for Quads\n");
         case;
             assert(false, "Shouldn't have gotten here. Some type is wrong");
         }
 
-        updateNodeBounds(T);
-        if node.objectCount == 1 return;
+    updateNodeBounds(T);
+    if node.objectCount == 1 return;
 
-        subdivide(T);
-    }
-    updateNodeBounds :: ($T : Type, currentDepth : u64 = 0)
-    {
+    subdivide(T);
+}
+
+updateNodeBounds :: ($T : Type, currentDepth : u64 = 0)
+{
     #if T ==
     {
 
@@ -63,7 +67,7 @@ createTree :: ($T : Type)
 
             for 1 .. node.objectCount - 1
             {
-                bb = createSurroundingBox(bb, createSphereBoundingBox(SPHERES[node.firstObjectIdx + it])); 
+                bb = createSurroundingBox(*bb, *createSphereBoundingBox(SPHERES[node.firstObjectIdx + it])); 
             }
             node.boundingBox = bb;
 
@@ -76,7 +80,7 @@ createTree :: ($T : Type)
 
             for 1 .. node.objectCount - 1
             {
-                bb = createSurroundingBox(bb, createSphereBoundingBox(MOVING_SPHERES[node.firstObjectIdx + it])); 
+                bb = createSurroundingBox(*bb, *createSphereBoundingBox(MOVING_SPHERES[node.firstObjectIdx + it])); 
             }
             node.boundingBox = bb;
 
@@ -210,15 +214,20 @@ subdivide :: ($T : Type, currentDepth : u64 = 0) //-> bool //*BVHNode():
 }
 
 /* Checks for a collision of the given ray with the objects defined in the BVHTree data */
-checkBVHCollision :: ($T : Type, ray : Ray, nodeIdx : u64 = 0) -> bool, HitData, T 
+checkBVHCollision :: ($T : Type, ray : Ray, nodeIdx : u64 = 0) -> bool, HitData, MaterialData
 {
     #if T ==
     {
         case Sphere;
+            if SPHERES_TREE.count == 0
+            {
+                return false, HitData.{}, MaterialData.{};
+            }
+
             node := *SPHERES_TREE[nodeIdx];
             if !checkBoundingBoxCollision(ray, node.boundingBox)
             {
-                return false, HitData.{}, Sphere.{};
+                return false, HitData.{}, MaterialData.{};
             }
 
             /* if its a leaf node */
@@ -241,29 +250,36 @@ checkBVHCollision :: ($T : Type, ray : Ray, nodeIdx : u64 = 0) -> bool, HitData,
                 if hasHit
                 {
                     // print("% %\n", hitData, sphereHit);
-                    return hasHit, hitData, sphereHit;
+                    return hasHit, hitData, sphereHit.materialData;
                 }
             }
             else
             {
-                hasHitL, hitDataL, sphereHitL := checkBVHCollision(T, ray, node.left);
+                hasHitL, hitDataL, materialDataL := checkBVHCollision(T, ray, node.left);
 
-                hasHitR, hitDataR, sphereHitR := checkBVHCollision(T, ray, node.left + 1);
+                hasHitR, hitDataR, materialDataR := checkBVHCollision(T, ray, node.left + 1);
                 if(hitDataL.dist < hitDataR.dist)
                 {
-                    return hasHitL, hitDataL, sphereHitL;
+                    return hasHitL, hitDataL, materialDataL;
                 }
                 else
                 {
-                    return hasHitR, hitDataR, sphereHitR;
+                    return hasHitR, hitDataR, materialDataR;
                 }
             }
 
         case MovingSphere;
+                // print("Moving Sphere");
+                // print("Moving Sphere Tree % count", MOVING_SPHERES_TREE.count);
+            if MOVING_SPHERES_TREE.count == 0
+            {
+                return false, HitData.{}, MaterialData.{};
+            }
+
             node := *MOVING_SPHERES_TREE[nodeIdx];
             if !checkBoundingBoxCollision(ray, node.boundingBox)
             {
-                return false, HitData.{}, Sphere.{};
+                return false, HitData.{}, MaterialData.{};
             }
 
             /* if its a leaf node */
@@ -271,10 +287,10 @@ checkBVHCollision :: ($T : Type, ray : Ray, nodeIdx : u64 = 0) -> bool, HitData,
             {
                 hasHit := false;
                 hitData: HitData;
-                sphereHit : Sphere;
+                sphereHit : MovingSphere;
                 for 0..node.objectCount - 1
                 {
-                    hit, lastHitData := checkSphereCollision(ray, MOVING_SPHERES[node.firstObjectIdx + it]);
+                    hit, lastHitData := checkMovingSphereCollision(ray, MOVING_SPHERES[node.firstObjectIdx + it]);
                     if hit && lastHitData.dist < hitData.dist
                     {
                         hasHit = true;
@@ -286,27 +302,29 @@ checkBVHCollision :: ($T : Type, ray : Ray, nodeIdx : u64 = 0) -> bool, HitData,
                 if hasHit
                 {
                     // print("% %\n", hitData, sphereHit);
-                    return hasHit, hitData, sphereHit;
+                    return hasHit, hitData, sphereHit.sphere.materialData;
                 }
             }
             else
             {
-                hasHitL, hitDataL, sphereHitL := checkBVHCollision(T, ray, node.left);
+                hasHitL, hitDataL, materialDataL := checkBVHCollision(T, ray, node.left);
 
-                hasHitR, hitDataR, sphereHitR := checkBVHCollision(T, ray, node.left + 1);
+                hasHitR, hitDataR, materialDataR := checkBVHCollision(T, ray, node.left + 1);
                 if(hitDataL.dist < hitDataR.dist)
                 {
-                    return hasHitL, hitDataL, sphereHitL;
+                    return hasHitL, hitDataL, materialDataL;
                 }
                 else
                 {
-                    return hasHitR, hitDataR, sphereHitR;
+                    return hasHitR, hitDataR, materialDataR;
                 }
             }
 
+        case Quad;
+            print("QUAD\n");
         case;
             assert(false, "Shouldn't have gotten here. Some type is wrong");
         }
-        return false, HitData.{}, Sphere.{};
+        return false, HitData.{}, MaterialData.{};
 }
 

@@ -13,8 +13,7 @@ Sphere :: struct
 {
     center : Vector3;
     radius : float;
-    material : MaterialType;
-    materialId : int; // id in material array
+    using materialData : MaterialData;
 }
 
 MovingSphere :: struct
@@ -31,6 +30,15 @@ MovingSphere :: struct
 
 /** STATIC **/
 
+makeSphere :: (center : Vector3, radius : float, materialData : MaterialData) -> Sphere
+{
+    return Sphere.{center, radius, materialData};
+}
+
+makeMovingSphere :: (center : Vector3, radius : float, materialData : MaterialData, center1 : Vector3, movingTime: float) -> MovingSphere
+{
+    return MovingSphere.{makeSphere(center, radius, materialData), center1, movingTime};
+}
 /**
 * Verifies if the ray hit a sphere with the given properties
 */
@@ -154,8 +162,6 @@ getSphereUV :: (point : Vector3) -> Vector2 //uv
     //     <0 1 0> yields <0.50 1.00>       < 0 -1  0> yields <0.50 0.00>
     //     <0 0 1> yields <0.25 0.50>       < 0  0 -1> yields <0.75 0.50>
 
-    // auto theta = acos(-p.y());
-    // auto phi = atan2(-p.z(), p.x()) + PI;
     theta := acos(-point.y);
     phi := atan2(-point.z, point.x) + PI;
 

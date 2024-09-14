@@ -3,7 +3,8 @@
 #import "Random";
 
 #load "utils.jai";
-#load "sphere.jai";
+#load "primitives/sphere.jai";
+#load "primitives/quad.jai";
 #load "material.jai";
 #load "bounding_box.jai";
 
@@ -12,8 +13,10 @@ JPG_CHANNELS :: 3;
 OUTPUT_NORMALS :: false;
 
 /* Color Data */
-BACKGROUND_COLOR1 :: Vector3.{0.8, 0.8, 0.8};
-BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
+// BACKGROUND_COLOR1 :: Vector3.{0.8, 0.8, 0.8};
+// BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
+BACKGROUND_COLOR1 :: Vector3.{0, 0, 0};
+BACKGROUND_COLOR2 :: Vector3.{0, 0, 0};
 RED :: Vector3.{1, 0, 0};
 GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
@@ -156,25 +159,40 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
     {
         if currentDepth >= MAX_RAYS
         {
-            // TODO(Goose): Magic number, change this
             return BLACK;
         }
         // gets the closest hit value to print on the fragment by iterating over all objects and gets the closest
-        hasHit := false;
-        hitData: HitData;
-        sphereHit : Sphere;
-        hasHit, hitData, sphereHit = checkBVHCollision(Sphere, ray);
 
-        for MOVING_SPHERES
-        {
-            hit, lastHitData := checkMovingSphereCollision(ray, it);
-            if hit && lastHitData.dist < hitData.dist
+        // Static Spheres
+        hasHit := false;
+        hitData:  HitData;
+        hitMaterialData : MaterialData;
+        hasHit, hitData, hitMaterialData = checkBVHCollision(Sphere, ray);
+
+        // Moving Spheres
+        hasHitMoving := false;
+        movingHitData: HitData;
+        hitMaterialDataMoving : MaterialData;
+        hasHitMoving, movingHitData, hitMaterialDataMoving = checkBVHCollision(MovingSphere, ray);
+
+        //Quad
+
+        // Verify which of each is the closest one
+        if hasHit && hasHitMoving {
+            // need to check which one is closest and set the data accordingly
+            if hitData.dist > movingHitData.dist
             {
-                hasHit = true;
-                hitData = lastHitData;
-                sphereHit = it.sphere;
+                hasHit = hasHitMoving;
+                hitData = movingHitData;
+                hitMaterialData = hitMaterialDataMoving;
             }
         }
+        else if hasHitMoving  {
+            hasHit = hasHitMoving;
+            hitData = movingHitData;
+            hitMaterialData = hitMaterialDataMoving;
+        }
+
         //shows normal color
         if hasHit
         {
@@ -185,27 +203,28 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
             else
             {
                 /* Diffuse */
-                //TODO(Goose): This can be replaced by compile time Type verification. This is a solution "A la C"
-                if sphereHit.material ==
+                if hitMaterialData.material ==
                 {
                     case .DIFFUSE;
                         bounceRay := getDiffuseRay(ray.shutterTime, hitData);
                 //TODO(Goose): Replace this with a function on object.jai. It should calculate the material + texture color 
-                        materialData := DIFFUSE_DATA[sphereHit.materialId];
-                        return materialData.attenuation * checkForCollisions(bounceRay, currentDepth + 1) * getTextureAtUV(materialData.textureType, hitData.uv, hitData.coordinates, materialData.textureIdx);
+                        materialDiffuse := MATERIAL_DIFFUSE[hitMaterialData.materialId];
+                        return materialDiffuse.attenuation * checkForCollisions(bounceRay, currentDepth + 1) * getTextureAtUV(materialDiffuse.textureType, hitData.uv, hitData.coordinates, materialDiffuse.textureIdx);
 
                     case .METAL;
-                        reflectRay := getReflectRay(ray, hitData, sphereHit);
-                        materialData := METAL_DATA[sphereHit.materialId];
-                        return materialData.attenuation * checkForCollisions(reflectRay, currentDepth + 1) * getTextureAtUV(materialData.textureType, hitData.uv, hitData.coordinates, materialData.textureIdx);
+                        reflectRay := getReflectRay(ray, hitData, hitMaterialData);
+                        materialMetal := MATERIAL_METAL[hitMaterialData.materialId];
+                        return materialMetal.attenuation * checkForCollisions(reflectRay, currentDepth + 1) * getTextureAtUV(materialMetal.textureType, hitData.uv, hitData.coordinates, materialMetal.textureIdx);
 
                     case .DIELECTRIC;
-                        dielectricRay := getDielectricRay(ray, hitData, sphereHit);
-                        materialData := DIELECTRIC_DATA[sphereHit.materialId];
-                        return materialData.attenuation * checkForCollisions(dielectricRay, currentDepth + 1) * getTextureAtUV(materialData.textureType, hitData.uv, hitData.coordinates, materialData.textureIdx);
+                        dielectricRay := getDielectricRay(ray, hitData, hitMaterialData);
+                        materialDielectric := MATERIAL_DIELECTRIC[hitMaterialData.materialId];
+                        return materialDielectric.attenuation * checkForCollisions(dielectricRay, currentDepth + 1) * getTextureAtUV(materialDielectric.textureType, hitData.uv, hitData.coordinates, materialDielectric.textureIdx);
 
                     case .EMISSIVE;
-                        print("Implement Emissive material");
+                        // EMMISSIVE_DATA[
+                        materialEmissive := MATERIAL_EMISSIVE[hitMaterialData.materialId];
+                        return materialEmissive.emissiveValue * (materialEmissive.attenuation * getTextureAtUV(materialEmissive.textureType, hitData.uv, hitData.coordinates, materialEmissive.textureIdx));
                 }
             }
         }

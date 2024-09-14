@@ -18,12 +18,11 @@ MaterialType :: enum u8
 }
 
 
-// Material :: struct(T)
-// {
-//     attenuation : Vector3;
-//     textureType : T;
-//     textureIdx : u64;
-// }
+MaterialData :: struct
+{
+    material : MaterialType;
+    materialId : int; // id in material array
+}
 
 MaterialDiffuse :: struct
 {
@@ -42,6 +41,12 @@ MaterialDielectric :: struct
 {
     using material : MaterialDiffuse;
     indexOfRefraction : float;
+}
+
+MaterialEmissive :: struct
+{
+    using material : MaterialDiffuse;
+    emissiveValue : Vector3;
 }
 
 /* *** */
@@ -73,9 +78,15 @@ TexturePerlin :: struct
     perlin : PerlinNoise;
 }
 
+/** MATERIALS **/
+makeMaterialData :: (material : MaterialType, materialId : int) -> MaterialData
+{
+    return MaterialData.{material, materialId};
+}
+
 makeMaterialDiffuse :: (attenuation : Vector3, textureType : Type, textureIdx : int ) -> MaterialDiffuse
 {
-    return .{attenuation, textureType, textureIdx};
+    return MaterialDiffuse.{attenuation, textureType, textureIdx};
 }
 
 makeMaterialDielectric :: (attenuation : Vector3, textureType : Type, textureIdx : int, fuzz : float) -> MaterialDielectric
@@ -88,6 +99,12 @@ makeMaterialMetal :: (attenuation : Vector3, textureType : Type, textureIdx : in
     return .{MaterialDiffuse.{attenuation, textureType, textureIdx}, indexOfRefraction};
 }
 
+makeMaterialEmissive :: (attenuation : Vector3, emissiveValue : Vector3, textureType : Type, textureIdx : int) -> MaterialEmissive
+{
+    return MaterialEmissive.{makeMaterialDiffuse(attenuation, textureType, textureIdx), emissiveValue};
+}
+
+/** TEXTURES **/
 makeTextureSolid :: (color : Vector3) -> TextureSolid
 {
     return .{color};
