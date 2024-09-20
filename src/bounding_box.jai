@@ -21,7 +21,7 @@ BoundingBox :: struct //($T : Type)
 /**
 * Creates a BoundingBox for a static Sphere object
 */ 
-createSphereBoundingBox :: (sphere : Sphere) -> BoundingBox
+createBoundingBox :: (sphere : Sphere) -> BoundingBox
 {
     return BoundingBox.{
         sphere.center - make_vector3(sphere.radius, sphere.radius, sphere.radius),
@@ -33,7 +33,7 @@ createSphereBoundingBox :: (sphere : Sphere) -> BoundingBox
 /**
 * Creates a BoundingBox for a moving Sphere object
 */ 
-createSphereBoundingBox :: (sphere : MovingSphere) -> BoundingBox
+createBoundingBox :: (sphere : MovingSphere) -> BoundingBox
 {
     b1 := BoundingBox.{
         sphere.center - make_vector3(sphere.sphere.radius, sphere.sphere.radius, sphere.sphere.radius),
@@ -52,35 +52,75 @@ createSphereBoundingBox :: (sphere : MovingSphere) -> BoundingBox
 /**
 * Creates a BoundingBox for a static quad
 */
-createQuadBoundingBox :: (quad : Quad) -> BoundingBox
+createBoundingBox :: (quad : Quad) -> BoundingBox
 {
     // if the quad is parallel to a duo of axis, add a padding for the bounding box. Because quads, being planes, and therefore 2D, might break the BVH algorithm if we send a plane box as well
-    padBoundingBox :: (box : *BoundingBox)
+    outputBox : BoundingBox;
+    PAD_DELTA : float :  0.0001;
+    if quad.alignement ==
     {
-        PAD_DELTA : float :  0.0001;
-        if abs(box.min.x - box.max.x) < PAD_DELTA
+        case PlaneAligned.XY;
+            outputBox = BoundingBox.{Vector3.{quad.p1x0, quad.p2x0, quad.k - PAD_DELTA}, Vector3.{quad.p1x1, quad.p2x1, quad.k + PAD_DELTA}, STATIC_OBJECT};
+        case PlaneAligned.XZ;
+            outputBox = BoundingBox.{Vector3.{quad.p1x0, quad.k - PAD_DELTA, quad.p2x0}, Vector3.{quad.p1x1, quad.k + PAD_DELTA, quad.p2x1}, STATIC_OBJECT};
+        case PlaneAligned.YZ;
+            outputBox = BoundingBox.{Vector3.{quad.k - PAD_DELTA, quad.p1x0, quad.p2x0}, Vector3.{quad.k + PAD_DELTA, quad.p1x1, quad.p2x1}, STATIC_OBJECT};
+    }
+    return outputBox;
+}
+
+createBoundingBox :: (box : Box) -> BoundingBox
+{
+    outputBox1 : BoundingBox;
+    outputBox2 : BoundingBox;
+
+    PAD_DELTA : float :  0.0001;
+    if box.quads[0].alignement ==
+    {
+        case PlaneAligned.XY;
+            outputBox1 = BoundingBox.{
+                Vector3.{box.quads[0].p1x0, box.quads[0].p2x0, box.quads[0].k - PAD_DELTA} + box.translate,
+                Vector3.{box.quads[0].p1x1, box.quads[0].p2x1, box.quads[0].k + PAD_DELTA} + box.translate,
+                STATIC_OBJECT
+            };
+        case PlaneAligned.XZ;
+            outputBox1 = BoundingBox.{
+                Vector3.{box.quads[0].p1x0, box.quads[0].k - PAD_DELTA, box.quads[0].p2x0} + box.translate,
+                Vector3.{box.quads[0].p1x1, box.quads[0].k + PAD_DELTA, box.quads[0].p2x1} + box.translate,
+                STATIC_OBJECT
+            };
+        case PlaneAligned.YZ;
+            outputBox1 = BoundingBox.{
+                Vector3.{box.quads[0].k - PAD_DELTA, box.quads[0].p1x0, box.quads[0].p2x0} + box.translate,
+                Vector3.{box.quads[0].k + PAD_DELTA, box.quads[0].p1x1, box.quads[0].p2x1} + box.translate,
+                STATIC_OBJECT
+            };
+    }
+    for 1 .. BOX_NUM_OF_QUADS - 1
+    {
+        if box.quads[it].alignement ==
         {
-            box.min.x -= PAD_DELTA;
-            box.max.x += PAD_DELTA;
-        }
-        else if abs(box.min.y - box.max.y) < PAD_DELTA
-        {
-            box.min.y -= PAD_DELTA;
-            box.max.y += PAD_DELTA;
-        }
-        else if abs(box.min.z - box.max.z) < PAD_DELTA
-        {
-            box.min.z -= PAD_DELTA;
-            box.max.z += PAD_DELTA;
+            case PlaneAligned.XY;
+                outputBox2 = BoundingBox.{
+                    Vector3.{box.quads[it].p1x0, box.quads[it].p2x0, box.quads[it].k - PAD_DELTA} + box.translate,
+                    Vector3.{box.quads[it].p1x1, box.quads[it].p2x1, box.quads[it].k + PAD_DELTA} + box.translate,
+                    STATIC_OBJECT
+                };
+            case PlaneAligned.XZ;
+                outputBox2 = BoundingBox.{
+                    Vector3.{box.quads[it].p1x0, box.quads[it].k - PAD_DELTA, box.quads[it].p2x0} + box.translate,
+                    Vector3.{box.quads[it].p1x1, box.quads[it].k + PAD_DELTA, box.quads[it].p2x1} + box.translate,
+                    STATIC_OBJECT};
+            case PlaneAligned.YZ;
+                outputBox2 = BoundingBox.{
+                    Vector3.{box.quads[it].k - PAD_DELTA, box.quads[it].p1x0, box.quads[it].p2x0} + box.translate,
+                    Vector3.{box.quads[it].k + PAD_DELTA, box.quads[it].p1x1, box.quads[it].p2x1} + box.translate,
+                    STATIC_OBJECT
+                };
+            outputBox1 = createSurroundingBox(*outputBox1, *outputBox2);
         }
     }
-    // Compute the bounding box of all four vertices.
-    b1 := BoundingBox.{quad.point, quad.point + quad.u + quad.v, STATIC_OBJECT};
-    b2 := BoundingBox.{quad.point + quad.u, quad.point + quad.v, STATIC_OBJECT};
-
-    bb := createSurroundingBox(*b1, *b2);
-    padBoundingBox(*bb);
-    return bb;
+    return outputBox1;
 }
 
 /**
@@ -100,7 +140,7 @@ createSurroundingBox :: (box1 : *BoundingBox, box2 : *BoundingBox) -> BoundingBo
 /**
 * Gets a ray and the limits of the box (tMin and tMax) and calculates if the ray goes through them 
 */
-checkBoundingBoxCollision :: (ray : Ray, box : BoundingBox, tMin : float = 0.001, tMax : float = FLOAT32_MAX) -> bool
+checkBoundingBoxCollision :: (ray : Ray, box : BoundingBox, tMin : float = 0.0001, tMax : float = FLOAT32_MAX) -> bool
 {
     for 0 .. 2
     {

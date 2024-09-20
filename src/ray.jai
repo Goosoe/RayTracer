@@ -203,8 +203,3 @@ getMovingDielectricRay :: (ray : Ray, hitData : HitData, materialData : Material
         ray.shutterTime
     };
 }
-
-// getEmissiveRay :: ( ) -> Ray
-// {
-//
-// }

@@ -5,6 +5,7 @@
 #load "utils.jai";
 #load "primitives/sphere.jai";
 #load "primitives/quad.jai";
+#load "primitives/box.jai";
 #load "material.jai";
 #load "bounding_box.jai";
 
@@ -13,10 +14,12 @@ JPG_CHANNELS :: 3;
 OUTPUT_NORMALS :: false;
 
 /* Color Data */
+/*ALL SCENES */
 // BACKGROUND_COLOR1 :: Vector3.{0.8, 0.8, 0.8};
 // BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
-BACKGROUND_COLOR1 :: Vector3.{0, 0, 0};
-BACKGROUND_COLOR2 :: Vector3.{0, 0, 0};
+/* SCENE 6 */
+BACKGROUND_COLOR1 ::  BLACK;
+BACKGROUND_COLOR2 :: BLACK;
 RED :: Vector3.{1, 0, 0};
 GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
@@ -27,24 +30,38 @@ BLACK :: Vector3.{0, 0, 0};
 MOTION_BLUR :: false;
 SHUTTER_TIME :: 2;
 /* Render Data */
-MAX_RAYS :: 100;
+MAX_RAYS :: 8000;
 
 /* Scene Data */
 // ORIGIN :: Vector3.{0.0, 0.0, 0.0};
 
 /* Camera Data */
-CAMERA_LOCATION :: Vector3.{4, 1.5, 1.5};
-CAMERA_LOOK_AT :: Vector3.{0, 0, 0};
+/** TODO(Goose): Make this scene specific */
+/*ALL SCENES */
+// CAMERA_LOCATION :: Vector3.{10, 5, 2};
+// CAMERA_LOOK_AT :: Vector3.{0, 1, 0};
+
+/* SCENE 6 */
+CAMERA_LOCATION :: Vector3.{278, 278, -800};
+CAMERA_LOOK_AT :: Vector3.{278, 278, 0};
+
+/* SCENE 7 */
+// CAMERA_LOCATION :: Vector3.{-3, 1, 0};
+// CAMERA_LOOK_AT :: Vector3.{0, 1, 0};
+
 CAMERA_UP :: Vector3.{0, 1, 0};
 // Set this to 0 to not have defocus
 CAMERA_DEFOCUS_ANGLE :: 0.0;
 CAMERA_FOCUS_DIST :: 1;
 // Vertical Degrees
-FOV :: 80;
+/* ALL SCENES */
+// FOV :: 80;
+/* SCENE 6 */
+FOV :: 40;
 
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
-AA_SAMPLE_NUM :: 100;
+AA_SAMPLE_NUM :: 500;
 
 /* Viewport data */
 ASPECT_RATIO :: cast(float)IMAGE_X / cast(float)IMAGE_Y;
@@ -68,7 +85,7 @@ Camera :: struct
 camera : Camera;
 
 /** RAY **/
-MAX_DIST :: 300.0;
+MAX_DIST :: 8000.0;
 // Using min_dist > 0 to avoid hits that are extremely close, solving shadow acne
 MIN_DIST :: 0.001;
 
@@ -128,7 +145,11 @@ renderFragment :: (coords : Vector2) -> Vector3
             /* TODO(Goose): Add texture color calculation herer*/
             color += checkForCollisions(ray);
         }
-        return color / (AA_SAMPLE_NUM);
+        color = color / (AA_SAMPLE_NUM);
+        color.x = clamp(color.x, 0, 1);
+        color.y = clamp(color.y, 0, 1);
+        color.z = clamp(color.z, 0, 1);
+        return color;
     }
     else    // NO ANTI_ALIASING
     {
@@ -170,34 +191,55 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         hasHit, hitData, hitMaterialData = checkBVHCollision(Sphere, ray);
 
         // Moving Spheres
-        hasHitMoving := false;
-        movingHitData: HitData;
-        hitMaterialDataMoving : MaterialData;
-        hasHitMoving, movingHitData, hitMaterialDataMoving = checkBVHCollision(MovingSphere, ray);
+        {
+            hasHitMoving := false;
+            movingHitData: HitData;
+            hitMovingMaterialData : MaterialData;
+            hasHitMoving, movingHitData, hitMovingMaterialData = checkBVHCollision(MovingSphere, ray);
 
-        //Quad
-
-        // Verify which of each is the closest one
-        if hasHit && hasHitMoving {
-            // need to check which one is closest and set the data accordingly
             if hitData.dist > movingHitData.dist
             {
                 hasHit = hasHitMoving;
                 hitData = movingHitData;
-                hitMaterialData = hitMaterialDataMoving;
+                hitMaterialData = hitMovingMaterialData;
             }
         }
-        else if hasHitMoving  {
-            hasHit = hasHitMoving;
-            hitData = movingHitData;
-            hitMaterialData = hitMaterialDataMoving;
+
+        // Quad
+        {
+            hasHitQuad := false;
+            quadHitData: HitData;
+            hitQuadMaterialData : MaterialData;
+            hasHitQuad, quadHitData, hitQuadMaterialData = checkBVHCollision(Quad, ray);
+
+            if hitData.dist > quadHitData.dist
+            {
+                hasHit = hasHitQuad;
+                hitData = quadHitData;
+                hitMaterialData = hitQuadMaterialData;
+            }
         }
 
+        // Box
+        {
+            hasHitBox := false;
+            boxHitData: HitData;
+            hitBoxMaterialData : MaterialData;
+            hasHitBox, boxHitData, hitBoxMaterialData = checkBVHCollision(Box, ray);
+
+            if hitData.dist > boxHitData.dist
+            {
+                hasHit = hasHitBox;
+                hitData = boxHitData;
+                hitMaterialData = hitBoxMaterialData;
+            }
+        }
         //shows normal color
         if hasHit
         {
             #if OUTPUT_NORMALS
             {
+                print("%\n", hitData.normal);
                 return 0.5 * make_vector3(hitData.normal.x + 1, hitData.normal.y + 1, hitData.normal.z + 1);
             }
             else
@@ -222,9 +264,11 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
                         return materialDielectric.attenuation * checkForCollisions(dielectricRay, currentDepth + 1) * getTextureAtUV(materialDielectric.textureType, hitData.uv, hitData.coordinates, materialDielectric.textureIdx);
 
                     case .EMISSIVE;
-                        // EMMISSIVE_DATA[
+                        bounceRay := getDiffuseRay(ray.shutterTime, hitData);
                         materialEmissive := MATERIAL_EMISSIVE[hitMaterialData.materialId];
-                        return materialEmissive.emissiveValue * (materialEmissive.attenuation * getTextureAtUV(materialEmissive.textureType, hitData.uv, hitData.coordinates, materialEmissive.textureIdx));
+                        // return materialEmissive.emissiveValue;
+                        return materialEmissive.emissiveValue * getTextureAtUV(materialEmissive.textureType, hitData.uv, hitData.coordinates, materialEmissive.textureIdx);
+                        // return materialEmissive.emissiveValue + checkForCollisions(bounceRay, currentDepth + 1)  * getTextureAtUV(materialEmissive.textureType, hitData.uv, hitData.coordinates, materialEmissive.textureIdx);
                 }
             }
         }

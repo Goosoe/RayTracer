@@ -39,6 +39,7 @@ makeMovingSphere :: (center : Vector3, radius : float, materialData : MaterialDa
 {
     return MovingSphere.{makeSphere(center, radius, materialData), center1, movingTime};
 }
+
 /**
 * Verifies if the ray hit a sphere with the given properties
 */

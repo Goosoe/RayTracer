@@ -26,8 +26,8 @@ generateRandomInUnitCircle :: () -> Vector3
     while true
     {
         res := Vector3.{
-            random_get_within_range(0, 1),
-            random_get_within_range(0, 1),
+            random_get_within_range(-1, 1),
+            random_get_within_range(-1, 1),
             0
         };
         if length_squared(res) < 1.0
@@ -42,9 +42,9 @@ generateRandomInUnitSphere :: () -> Vector3
     while true
     {
         res := Vector3.{
-            random_get_within_range(0, 1),
-            random_get_within_range(0, 1),
-            random_get_within_range(0, 1)
+            random_get_within_range(-1, 1),
+            random_get_within_range(-1, 1),
+            random_get_within_range(-1, 1)
         };
         if length_squared(res) < 1.0
         {

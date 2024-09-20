@@ -13,8 +13,10 @@
 #load "BVH.jai";
 #load "perlin.jai";
 
-IMAGE_X :: 1920;
-IMAGE_Y :: 1080;
+// IMAGE_X :: 1920;
+// IMAGE_Y :: 1080;
+IMAGE_X :: 400;
+IMAGE_Y :: 200;
 IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
 MULTI_THREAD :: true;
 NUM_THREADS :: 10;
@@ -61,6 +63,16 @@ MOVING_SPHERES : [..]  MovingSphere;
 MOVING_SPHERES_IDX : [..]  int;
 MOVING_SPHERES_TREE : [..] BVHNode;
 
+/* QUADS */
+QUADS : [..]  Quad;
+QUADS_IDX : [..] int;
+QUADS_TREE : [..] BVHNode;
+
+/* BOX */
+BOXES : [..]  Box;
+BOXES_IDX : [..] int;
+BOXES_TREE : [..] BVHNode;
+
 /* MATERIAL DATA */
 MATERIAL_DIFFUSE : [..] MaterialDiffuse;
 
@@ -102,14 +114,16 @@ main :: ()
             setupScene6();
         case 7;
             setupScene7();
+        case 8;
+            setupScene8();
         case;
             assert(false, "Invalid scene number selected: %\n", SCENE_TO_RENDER);
     }
 
     createTree(Sphere);
     createTree(MovingSphere);
-    //TODO(Goose): uncomment me
-    // createTree(Quad);
+    createTree(Quad);
+    createTree(Box);
 
     setupThreadGroup();
 #if MULTI_THREAD
@@ -216,7 +230,9 @@ addObjectToScene :: (object : $T)
         case MovingSphere;
             array_add(*MOVING_SPHERES, object);
         case Quad;
-            // array_add(*QUAD, object);
+            array_add(*QUADS, object);
+        case Box;
+            array_add(*BOXES, object);
     }
 }
 /* Creates a big scene with dozens of static spheres around 3 big spheres. Each of a different material. The floor sphere is checkered */
@@ -431,8 +447,44 @@ setupScene5 :: ()
     addObjectToScene(makeSphere(Vector3.{0, -500, 0}, 500, makeMaterialData(MaterialType.DIFFUSE, 0)));
     addObjectToScene(makeSphere(Vector3.{0, 2, 0}, 2, makeMaterialData(MaterialType.DIFFUSE, 1)));
 }
-/* An emissive static sphere to see if the emission is working*/
+/* Creates a Cornel Box */
 setupScene6 :: () 
+{
+    // ADD TEXTURES
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.75,0.75,0.75}));
+    WHITE_IDX :: 0;
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.65,0.05,0.05}));
+    RED_IDX :: 1;
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.12, 0.45, 0.15}));
+    GREEN_IDX :: 2;
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{3,3,3}));
+    LIGHT_IDX :: 3;
+
+    attenuation := Vector3.{0.5,0.51,0.51};
+
+    // ADD MATERIALS
+    array_add(*MATERIAL_EMISSIVE, makeMaterialEmissive(Vector3.{1,1,1}, Vector3.{15, 15, 15}, TextureSolid, LIGHT_IDX));
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, WHITE_IDX));
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, RED_IDX));
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, GREEN_IDX));
+
+    // Cornel Box
+    whiteMatData := makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX);
+    addObjectToScene(makeQuad(0, 555, 0, 555, 555, PlaneAligned.YZ, makeMaterialData(MaterialType.DIFFUSE, GREEN_IDX)));
+    addObjectToScene(makeQuad(0, 555, 0, 555, 0, PlaneAligned.YZ, makeMaterialData(MaterialType.DIFFUSE, RED_IDX)));
+    addObjectToScene(makeQuad(213, 343, 227, 332, 554,PlaneAligned.XZ, makeMaterialData(MaterialType.EMISSIVE, 0)));
+    addObjectToScene(makeQuad(0, 555, 0, 555, 0, PlaneAligned.XZ, whiteMatData));
+    addObjectToScene(makeQuad(0, 555, 0, 555, 555, PlaneAligned.XZ, whiteMatData));
+    addObjectToScene(makeQuad(0, 555, 0, 555, 555, PlaneAligned.XY, whiteMatData));
+    // Boxes - To add rotation, we must set them at the origin then apply a translation
+    addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 330, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{265,0,295} ));
+
+    addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 165, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{130,0,65}));
+
+}
+
+/* Some static spheres scene that render quickly for testing */
+setupScene7 :: () 
 {
     // ADD TEXTURES
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
@@ -441,17 +493,19 @@ setupScene6 :: ()
     color := generateRandomVec3() * generateRandomVec3();
     array_add(*TEXTURE_SOLID, makeTextureSolid(color));
 
-    // ADD MATERIALS
-    array_add(*MATERIAL_EMISSIVE, makeMaterialEmissive(Vector3.{1,1,1}, Vector3.{1, 1, 1}, TextureSolid, 0));
-    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, 0));
+    array_add(*MATERIAL_EMISSIVE, makeMaterialEmissive(Vector3.{1,1,1}, Vector3.{15, 15, 15}, TextureSolid, 0));
 
+    // ADD MATERIALS
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, 0));
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(Vector3.{1,1,1}, TextureSolid, 1));
+
+    addObjectToScene(makeQuad(2, 3, -1, 1, 4.5,PlaneAligned.YZ, makeMaterialData(MaterialType.EMISSIVE, 0)));
     addObjectToScene(makeSphere(Vector3.{0, -500, 0}, 500, makeMaterialData(MaterialType.DIFFUSE, 0)));
-    addObjectToScene(makeSphere(Vector3.{1, 2, -1}, 0.5, makeMaterialData(MaterialType.EMISSIVE, 0)));
-    addObjectToScene(makeSphere(Vector3.{-1, 1, -1}, 0.25, makeMaterialData(MaterialType.DIFFUSE, 0)));
+    // addObjectToScene(makeSphere(Vector3.{0, 2, 0}, 2, makeMaterialData(MaterialType.DIFFUSE, 1)));
 }
 
 /* Some static spheres scene that render quickly for testing */
-setupScene7 :: () 
+setupScene8 :: () 
 {
     // ADD TEXTURES
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
