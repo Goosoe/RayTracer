@@ -23,7 +23,7 @@ NUM_THREADS :: 10;
 
 NUM_WORK : s64 : IMAGE_X * IMAGE_Y;
 
-SCENE_TO_RENDER :: 6;
+SCENE_TO_RENDER :: 8;
 FILE_OUTPUT :: "out.jpg";
 
 
@@ -114,6 +114,8 @@ main :: ()
             setupScene6();
         case 7;
             setupScene7();
+        case 8;
+            setupScene8();
         case;
             assert(false, "Invalid scene number selected: %\n", SCENE_TO_RENDER);
     }
@@ -503,4 +505,107 @@ setupScene7 :: ()
     addObjectToScene(makeQuad(2, 3, -1, 1, 4.5,PlaneAligned.YZ, makeMaterialData(MaterialType.EMISSIVE, 0)));
     addObjectToScene(makeSphere(Vector3.{0, -500, 0}, 500, makeMaterialData(MaterialType.DIFFUSE, 0)));
     // addObjectToScene(makeSphere(Vector3.{0, 2, 0}, 2, makeMaterialData(MaterialType.DIFFUSE, 1)));
+}
+/* Final scene rendering*/
+setupScene8 :: () 
+{
+    TEXTURE_WHITE_IDX :: 0;
+
+    /* Allocate the known textures, such as the dielectric texture */
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
+    array_add(*MATERIAL_DIELECTRIC, makeMaterialDielectric(Vector3.{1,1,1}, TextureSolid, TEXTURE_WHITE_IDX, 1.5));
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(Vector3.{0.5, 0.5, 0.5}, TextureSolid, TEXTURE_WHITE_IDX));
+
+    array_add(*TEXTURE_PERLIN, makeTexturePerlin(Vector3.{0.5,0.5,0.5}, 7.0));
+    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(Vector3.{1,1,1}, TexturePerlin, TEXTURE_PERLIN.count -1));
+
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.6, 0.6, 0.6}));
+    array_add(*MATERIAL_METAL, makeMaterialMetal(make_vector3(0.8), TextureSolid, TEXTURE_SOLID.count - 1, 0.001));
+
+
+    // Static location of spheres
+    // addObjectToScene(makeSphere(Vector3.{0, -500, 0}, 500, makeMaterialData(MaterialType.DIFFUSE, 0)));
+    addObjectToScene(makeSphere(Vector3.{-2.5, 1, 0.5}, 1, makeMaterialData(MaterialType.METAL, 0)));
+    addObjectToScene(makeSphere(Vector3.{0, 1, 0}, 1, makeMaterialData(MaterialType.DIFFUSE, 1)));
+    addObjectToScene(makeSphere(Vector3.{2.5, 1, -0.5}, 1, makeMaterialData(MaterialType.DIELECTRIC, 0)));
+   
+   
+    BOX_SIZE :: 10.0;
+    SPHERE_RAD :: 2.0;
+    // Place the boxes
+    for x: -11 .. 11
+    {
+        for y: -11 .. 11
+        {
+            materialChance := random_get_zero_to_one();
+            pos := Vector3.{(x * BOX_SIZE),
+                (sin(cast(float)(x)) + cos(cast(float)(y))) * 6,
+                (y * BOX_SIZE)
+            };
+            if materialChance < 0.7
+            {
+                color := generateRandomVec3();
+                array_add(*TEXTURE_SOLID, TextureSolid.{color});
+                attenuation := generateRandomVec3();
+
+                array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, TEXTURE_SOLID.count - 1));
+                addObjectToScene(makeBox(pos, pos + Vector3.{BOX_SIZE, BOX_SIZE, BOX_SIZE}, makeMaterialData(MaterialType.DIFFUSE, MATERIAL_DIFFUSE.count - 1), Vector3.{0,0,0}, 0));
+                // addObjectToScene(makeSphere(pos, 0.2, makeMaterialData(MaterialType.DIFFUSE, MATERIAL_DIFFUSE.count - 1)));
+
+            }
+            // Metal
+            else if materialChance < 0.95
+            {
+                attenuation := make_vector3(0.5) + (generateRandomVec3() * 0.5);
+                fuzz := random_get_zero_to_one() * 0.5;
+                array_add(*MATERIAL_METAL, makeMaterialMetal(attenuation, TextureSolid, TEXTURE_WHITE_IDX, fuzz));
+                addObjectToScene(makeBox(pos, pos + Vector3.{BOX_SIZE, BOX_SIZE, BOX_SIZE}, makeMaterialData(MaterialType.METAL, MATERIAL_METAL.count - 1), Vector3.{0,0,0}, 0));
+                // addObjectToScene(makeSphere(pos, 0.2, makeMaterialData(MaterialType.METAL, MATERIAL_METAL.count - 1)));
+            }
+            // Glass
+            else
+            {
+                // addObjectToScene(makeSphere(pos, 0.2, makeMaterialData(MaterialType.DIELECTRIC, MATERIAL_DIELECTRIC.count - 1)));
+                addObjectToScene(makeBox(pos, pos + Vector3.{BOX_SIZE, BOX_SIZE, BOX_SIZE}, makeMaterialData(MaterialType.DIELECTRIC, MATERIAL_DIELECTRIC.count - 1), Vector3.{0,0,0}, 0));
+            }
+        }
+    }
+    // Place the Spheres
+    for x: -11 .. 11
+    {
+        for y: -11 .. 11
+        {
+            materialChance := random_get_zero_to_one();
+            sphereRandomRad := clamp(1.0, 10.0, SPHERE_RAD + random_get_zero_to_one() * 2);
+            sphereHeight := (sin(cast(float)(x)) + cos(cast(float)(y))) * 6 + BOX_SIZE;
+            pos := Vector3.{(x * BOX_SIZE) + (BOX_SIZE / 2),
+                sphereHeight + sphereRandomRad,
+                (y * BOX_SIZE) + (BOX_SIZE / 2)
+            };
+            if materialChance < 0.2
+            {
+                color := generateRandomVec3();
+                array_add(*TEXTURE_SOLID, TextureSolid.{color});
+                attenuation := generateRandomVec3();
+
+                array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, TEXTURE_SOLID.count - 1));
+                // addObjectToScene(makeBox(pos, pos + Vector3.{BOX_SIZE, BOX_SIZE, BOX_SIZE}, makeMaterialData(MaterialType.DIFFUSE, MATERIAL_DIFFUSE.count - 1), Vector3.{0,0,0}, 0));
+                addObjectToScene(makeSphere(pos, sphereRandomRad, makeMaterialData(MaterialType.DIFFUSE, MATERIAL_DIFFUSE.count - 1)));
+
+            }
+            // Metal
+            else if materialChance < 0.3
+            {
+                attenuation := make_vector3(0.5) + (generateRandomVec3() * 0.5);
+                fuzz := random_get_zero_to_one() * 0.5;
+                array_add(*MATERIAL_METAL, makeMaterialMetal(attenuation, TextureSolid, TEXTURE_WHITE_IDX, fuzz));
+                addObjectToScene(makeSphere(pos, sphereRandomRad, makeMaterialData(MaterialType.METAL, MATERIAL_METAL.count - 1)));
+            }
+            // Glass
+            else if materialChance < 0.35
+            {
+                addObjectToScene(makeSphere(pos, sphereRandomRad, makeMaterialData(MaterialType.DIELECTRIC, MATERIAL_DIELECTRIC.count - 1)));
+            }
+        }
+    }
 }

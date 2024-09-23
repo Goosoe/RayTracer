@@ -15,11 +15,11 @@ OUTPUT_NORMALS :: false;
 
 /* Color Data */
 /*ALL SCENES */
-// BACKGROUND_COLOR1 :: Vector3.{0.8, 0.8, 0.8};
-// BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
+BACKGROUND_COLOR1 :: Vector3.{0.8, 0.8, 0.8};
+BACKGROUND_COLOR2 :: Vector3.{0.5, 0.7, 1.0};
 /* SCENE 6 */
-BACKGROUND_COLOR1 ::  BLACK;
-BACKGROUND_COLOR2 :: BLACK;
+// BACKGROUND_COLOR1 ::  BLACK;
+// BACKGROUND_COLOR2 :: BLACK;
 RED :: Vector3.{1, 0, 0};
 GREEN :: Vector3.{0, 1, 0};
 BLUE :: Vector3.{0, 0, 1};
@@ -30,7 +30,7 @@ BLACK :: Vector3.{0, 0, 0};
 MOTION_BLUR :: false;
 SHUTTER_TIME :: 2;
 /* Render Data */
-MAX_RAYS :: 10000;
+MAX_RAYS :: 1000;
 //Cornel box
 // MAX_RAYS :: 15000;
 
@@ -44,12 +44,12 @@ MAX_RAYS :: 10000;
 // CAMERA_LOOK_AT :: Vector3.{0, 1, 0};
 
 /* SCENE 6 */
-CAMERA_LOCATION :: Vector3.{278, 278, -800};
-CAMERA_LOOK_AT :: Vector3.{278, 278, 0};
+// CAMERA_LOCATION :: Vector3.{278, 278, -800};
+// CAMERA_LOOK_AT :: Vector3.{278, 278, 0};
 
 /* SCENE 7 */
-// CAMERA_LOCATION :: Vector3.{-3, 1, 0};
-// CAMERA_LOOK_AT :: Vector3.{0, 1, 0};
+CAMERA_LOCATION :: Vector3.{-50, 35, -50};
+CAMERA_LOOK_AT :: Vector3.{0, 8, 0};
 
 CAMERA_UP :: Vector3.{0, 1, 0};
 // Set this to 0 to not have defocus
@@ -89,7 +89,9 @@ Camera :: struct
 camera : Camera;
 
 /** RAY **/
-MAX_DIST :: 8000.0;
+MAX_DIST :: 1000.0;
+// Scene 6
+// MAX_DIST :: 8000.0;
 // Using min_dist > 0 to avoid hits that are extremely close, solving shadow acne
 MIN_DIST :: 0.001;
 
