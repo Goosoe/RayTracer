@@ -8,7 +8,9 @@ Box :: struct
     center : Vector3;
     translate : Vector3;
     //TODO(Goose): If I want to implement rotations in all axis, change this to Vector3
-    rotationY : float;
+    // rotationY : float;  // in degrees (will be converted to radians)
+    sinTetha : float;
+    cosTetha : float;
 }
 
 makeBox :: (p1 : Vector3, p2 : Vector3, materialData : MaterialData, translate : Vector3 = Vector3.{0,0,0}, rotationY : float = 0.0) -> Box
@@ -24,7 +26,9 @@ makeBox :: (p1 : Vector3, p2 : Vector3, materialData : MaterialData, translate :
     box.quads[5] = makeAuxQuad(p1.y, p2.y, p1.z, p2.z, p1.x, PlaneAligned.YZ, materialData);
     box.center = (p1 + p2) * 0.5;
     box.translate = translate;
-    box.rotationY = rotationY;
+    rads := degreeToRadian(rotationY);
+    box.sinTetha = sin(rads);
+    box.cosTetha = cos(rads);
     return box;
 }
 
@@ -33,10 +37,10 @@ checkBoxCollision :: (ray : Ray, box : Box) -> bool, HitData, MaterialData
     hit : bool;
     hitData : HitData;
     materialData : MaterialData;
-    translatedRay := Ray.{ray.origin - box.translate, ray.direction, ray.shutterTime};
+    // translatedRay := Ray.{ray.origin - box.translate, ray.direction, ray.shutterTime};
     for 0 .. BOX_NUM_OF_QUADS - 1
     {
-        lastHit, lastHitData := checkAuxQuadCollision(translatedRay, box.translate, box.quads[it]);
+        lastHit, lastHitData := checkAuxQuadCollision(ray, box, it);
         if !lastHit
         {
             continue;

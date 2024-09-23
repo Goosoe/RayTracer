@@ -13,10 +13,10 @@
 #load "BVH.jai";
 #load "perlin.jai";
 
-// IMAGE_X :: 1920;
-// IMAGE_Y :: 1080;
-IMAGE_X :: 400;
-IMAGE_Y :: 200;
+IMAGE_X :: 1920;
+IMAGE_Y :: 1080;
+// IMAGE_X :: 400;
+// IMAGE_Y :: 200;
 IMAGE_DATA_SIZE :: IMAGE_X * IMAGE_Y * JPG_CHANNELS;
 MULTI_THREAD :: true;
 NUM_THREADS :: 10;
@@ -114,8 +114,6 @@ main :: ()
             setupScene6();
         case 7;
             setupScene7();
-        case 8;
-            setupScene8();
         case;
             assert(false, "Invalid scene number selected: %\n", SCENE_TO_RENDER);
     }
@@ -457,7 +455,7 @@ setupScene6 :: ()
     RED_IDX :: 1;
     array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{0.12, 0.45, 0.15}));
     GREEN_IDX :: 2;
-    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{3,3,3}));
+    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{7,7,7}));
     LIGHT_IDX :: 3;
 
     attenuation := Vector3.{0.5,0.51,0.51};
@@ -477,9 +475,12 @@ setupScene6 :: ()
     addObjectToScene(makeQuad(0, 555, 0, 555, 555, PlaneAligned.XZ, whiteMatData));
     addObjectToScene(makeQuad(0, 555, 0, 555, 555, PlaneAligned.XY, whiteMatData));
     // Boxes - To add rotation, we must set them at the origin then apply a translation
-    addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 330, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{265,0,295} ));
 
-    addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 165, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{130,0,65}));
+    addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 330, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{265,0,295}, -15));
+
+    // addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 330, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{0,0,0}, 0));
+
+    addObjectToScene(makeBox(Vector3.{0, 0, 0}, Vector3.{165, 165, 165}, makeMaterialData(MaterialType.DIFFUSE, WHITE_IDX), Vector3.{130,0,65}, 18));
 
 }
 
@@ -502,22 +503,4 @@ setupScene7 :: ()
     addObjectToScene(makeQuad(2, 3, -1, 1, 4.5,PlaneAligned.YZ, makeMaterialData(MaterialType.EMISSIVE, 0)));
     addObjectToScene(makeSphere(Vector3.{0, -500, 0}, 500, makeMaterialData(MaterialType.DIFFUSE, 0)));
     // addObjectToScene(makeSphere(Vector3.{0, 2, 0}, 2, makeMaterialData(MaterialType.DIFFUSE, 1)));
-}
-
-/* Some static spheres scene that render quickly for testing */
-setupScene8 :: () 
-{
-    // ADD TEXTURES
-    array_add(*TEXTURE_SOLID, makeTextureSolid(Vector3.{1,1,1}));
-
-    attenuation := generateRandomVec3() * generateRandomVec3();
-    color := generateRandomVec3() * generateRandomVec3();
-    array_add(*TEXTURE_SOLID, makeTextureSolid(color));
-
-    // ADD MATERIALS
-    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(attenuation, TextureSolid, 0));
-    array_add(*MATERIAL_DIFFUSE, makeMaterialDiffuse(Vector3.{1,1,1}, TextureSolid, 1));
-
-    addObjectToScene(makeSphere(Vector3.{0, -500, 0}, 500, makeMaterialData(MaterialType.DIFFUSE, 0)));
-    addObjectToScene(makeSphere(Vector3.{0, 2, 0}, 2, makeMaterialData(MaterialType.DIFFUSE, 1)));
 }

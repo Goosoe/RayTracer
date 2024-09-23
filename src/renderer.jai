@@ -30,7 +30,9 @@ BLACK :: Vector3.{0, 0, 0};
 MOTION_BLUR :: false;
 SHUTTER_TIME :: 2;
 /* Render Data */
-MAX_RAYS :: 8000;
+MAX_RAYS :: 10000;
+//Cornel box
+// MAX_RAYS :: 15000;
 
 /* Scene Data */
 // ORIGIN :: Vector3.{0.0, 0.0, 0.0};
@@ -57,11 +59,13 @@ CAMERA_FOCUS_DIST :: 1;
 /* ALL SCENES */
 // FOV :: 80;
 /* SCENE 6 */
-FOV :: 40;
+FOV :: 38;
 
 /* Anti-Aliasing */
 ANTI_ALIASING :: true;
 AA_SAMPLE_NUM :: 500;
+//Cornel Box
+// AA_SAMPLE_NUM :: 5000;
 
 /* Viewport data */
 ASPECT_RATIO :: cast(float)IMAGE_X / cast(float)IMAGE_Y;
@@ -239,7 +243,6 @@ checkForCollisions :: (ray : Ray, currentDepth : int = 0) -> Vector3
         {
             #if OUTPUT_NORMALS
             {
-                print("%\n", hitData.normal);
                 return 0.5 * make_vector3(hitData.normal.x + 1, hitData.normal.y + 1, hitData.normal.z + 1);
             }
             else

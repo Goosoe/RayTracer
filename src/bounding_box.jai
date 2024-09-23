@@ -4,6 +4,7 @@
 /* Using the AABB bounding box algorithm*/
 
 STATIC_OBJECT :: 0.0;
+PAD_DELTA : float :  0.0001;
 
 
 BoundingBox :: struct //($T : Type)
@@ -56,7 +57,6 @@ createBoundingBox :: (quad : Quad) -> BoundingBox
 {
     // if the quad is parallel to a duo of axis, add a padding for the bounding box. Because quads, being planes, and therefore 2D, might break the BVH algorithm if we send a plane box as well
     outputBox : BoundingBox;
-    PAD_DELTA : float :  0.0001;
     if quad.alignement ==
     {
         case PlaneAligned.XY;
@@ -71,56 +71,69 @@ createBoundingBox :: (quad : Quad) -> BoundingBox
 
 createBoundingBox :: (box : Box) -> BoundingBox
 {
-    outputBox1 : BoundingBox;
-    outputBox2 : BoundingBox;
 
-    PAD_DELTA : float :  0.0001;
-    if box.quads[0].alignement ==
+    // create bounding box
+    outputBox := createBoundingBoxAux(box.quads[0]);
+    for 1 .. BOX_NUM_OF_QUADS - 1
+    {
+        outputBox = createSurroundingBox(*outputBox, *createBoundingBoxAux(box.quads[it]));
+    }
+    //rotate 
+        for i: 0 .. 1
+        {
+            for j: 0 .. 1
+            {
+                for k: 0 .. 1
+                {
+                    x := i * outputBox.max.x + ((1 - i) * outputBox.min.x);
+                    y := i * outputBox.max.y + ((1 - j) * outputBox.min.y);
+                    z := i * outputBox.max.z + ((1 - k) * outputBox.min.z);
+                    rotX := box.cosTetha * x + box.sinTetha * z;
+                    rotZ := -box.sinTetha * x + box.cosTetha * z;
+                    newCoords := Vector3.{rotX, y, rotZ};
+
+                    outputBox.min.x = min(outputBox.min.x, newCoords.x);
+                    outputBox.max.x = max(outputBox.max.x, newCoords.x);
+                    outputBox.min.y = min(outputBox.min.y, newCoords.y);
+                    outputBox.max.y = max(outputBox.max.y, newCoords.y);
+                    outputBox.min.z = min(outputBox.min.z, newCoords.z);
+                    outputBox.max.z = max(outputBox.max.z, newCoords.z);
+                }
+            }
+        }
+    //translate
+    outputBox.min += box.translate;
+    outputBox.max += box.translate;
+    // right now the "center" of the object is in the bottom left quad value. we want to offset it so it moves to the center of the bottom quad
+    return outputBox;
+}
+
+createBoundingBoxAux :: (quad : AuxQuad) -> BoundingBox
+{
+    outputBox : BoundingBox;
+
+    if quad.alignement ==
     {
         case PlaneAligned.XY;
-            outputBox1 = BoundingBox.{
-                Vector3.{box.quads[0].p1x0, box.quads[0].p2x0, box.quads[0].k - PAD_DELTA} + box.translate,
-                Vector3.{box.quads[0].p1x1, box.quads[0].p2x1, box.quads[0].k + PAD_DELTA} + box.translate,
+            outputBox = BoundingBox.{
+                Vector3.{quad.p1x0, quad.p2x0, quad.k - PAD_DELTA},
+                Vector3.{quad.p1x1, quad.p2x1, quad.k + PAD_DELTA},
                 STATIC_OBJECT
             };
         case PlaneAligned.XZ;
-            outputBox1 = BoundingBox.{
-                Vector3.{box.quads[0].p1x0, box.quads[0].k - PAD_DELTA, box.quads[0].p2x0} + box.translate,
-                Vector3.{box.quads[0].p1x1, box.quads[0].k + PAD_DELTA, box.quads[0].p2x1} + box.translate,
+            outputBox = BoundingBox.{
+                Vector3.{quad.p1x0, quad.k - PAD_DELTA, quad.p2x0},
+                Vector3.{quad.p1x1, quad.k + PAD_DELTA, quad.p2x1},
                 STATIC_OBJECT
             };
         case PlaneAligned.YZ;
-            outputBox1 = BoundingBox.{
-                Vector3.{box.quads[0].k - PAD_DELTA, box.quads[0].p1x0, box.quads[0].p2x0} + box.translate,
-                Vector3.{box.quads[0].k + PAD_DELTA, box.quads[0].p1x1, box.quads[0].p2x1} + box.translate,
+            outputBox = BoundingBox.{
+                Vector3.{quad.k - PAD_DELTA, quad.p1x0, quad.p2x0},
+                Vector3.{quad.k + PAD_DELTA, quad.p1x1, quad.p2x1},
                 STATIC_OBJECT
             };
     }
-    for 1 .. BOX_NUM_OF_QUADS - 1
-    {
-        if box.quads[it].alignement ==
-        {
-            case PlaneAligned.XY;
-                outputBox2 = BoundingBox.{
-                    Vector3.{box.quads[it].p1x0, box.quads[it].p2x0, box.quads[it].k - PAD_DELTA} + box.translate,
-                    Vector3.{box.quads[it].p1x1, box.quads[it].p2x1, box.quads[it].k + PAD_DELTA} + box.translate,
-                    STATIC_OBJECT
-                };
-            case PlaneAligned.XZ;
-                outputBox2 = BoundingBox.{
-                    Vector3.{box.quads[it].p1x0, box.quads[it].k - PAD_DELTA, box.quads[it].p2x0} + box.translate,
-                    Vector3.{box.quads[it].p1x1, box.quads[it].k + PAD_DELTA, box.quads[it].p2x1} + box.translate,
-                    STATIC_OBJECT};
-            case PlaneAligned.YZ;
-                outputBox2 = BoundingBox.{
-                    Vector3.{box.quads[it].k - PAD_DELTA, box.quads[it].p1x0, box.quads[it].p2x0} + box.translate,
-                    Vector3.{box.quads[it].k + PAD_DELTA, box.quads[it].p1x1, box.quads[it].p2x1} + box.translate,
-                    STATIC_OBJECT
-                };
-            outputBox1 = createSurroundingBox(*outputBox1, *outputBox2);
-        }
-    }
-    return outputBox1;
+    return outputBox;
 }
 
 /**
